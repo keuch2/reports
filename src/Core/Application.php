@@ -5,7 +5,17 @@ declare(strict_types=1);
 namespace MisterCo\Reports\Core;
 
 use Dotenv\Dotenv;
+use MisterCo\Reports\Repositories\ClienteRepository;
+use MisterCo\Reports\Repositories\ConfiguracionRepository;
+use MisterCo\Reports\Repositories\CuentaPublicitariaRepository;
+use MisterCo\Reports\Repositories\EntidadesMetaRepository;
+use MisterCo\Reports\Repositories\ImportacionRepository;
+use MisterCo\Reports\Repositories\MetricaSnapshotRepository;
 use MisterCo\Reports\Services\AuthService;
+use MisterCo\Reports\Services\DashboardService;
+use MisterCo\Reports\Services\Meta\ImportacionService;
+use MisterCo\Reports\Services\Meta\MetaTokenService;
+use MisterCo\Reports\Services\ReportePdfService;
 use Throwable;
 
 final class Application
@@ -45,6 +55,38 @@ final class Application
         $container->bind(AuthService::class, fn (Container $c) => new AuthService(
             $c->get(Database::class),
             $c->get(Session::class),
+        ));
+        $container->bind(Encryptor::class, fn () => new Encryptor((string) ($appConfig['key'] ?? '')));
+        $container->bind(ConfiguracionRepository::class, fn (Container $c) => new ConfiguracionRepository(
+            $c->get(Database::class),
+            $c->get(Encryptor::class),
+        ));
+        $container->bind(MetaTokenService::class, fn (Container $c) => new MetaTokenService(
+            $c->get(ConfiguracionRepository::class),
+            (string) ($_ENV['META_API_VERSION'] ?? 'v20.0'),
+        ));
+
+        // Repositorios
+        $container->bind(CuentaPublicitariaRepository::class, fn (Container $c) => new CuentaPublicitariaRepository($c->get(Database::class)));
+        $container->bind(ClienteRepository::class, fn (Container $c) => new ClienteRepository($c->get(Database::class)));
+        $container->bind(EntidadesMetaRepository::class, fn (Container $c) => new EntidadesMetaRepository($c->get(Database::class)));
+        $container->bind(MetricaSnapshotRepository::class, fn (Container $c) => new MetricaSnapshotRepository($c->get(Database::class)));
+        $container->bind(ImportacionRepository::class, fn (Container $c) => new ImportacionRepository($c->get(Database::class)));
+
+        // Servicios de dominio
+        $container->bind(ImportacionService::class, fn (Container $c) => new ImportacionService(
+            $c->get(MetaTokenService::class),
+            $c->get(CuentaPublicitariaRepository::class),
+            $c->get(EntidadesMetaRepository::class),
+            $c->get(MetricaSnapshotRepository::class),
+            $c->get(ImportacionRepository::class),
+        ));
+        $container->bind(DashboardService::class, fn (Container $c) => new DashboardService($c->get(Database::class)));
+        $container->bind(ReportePdfService::class, fn (Container $c) => new ReportePdfService(
+            $c->get(View::class),
+            $c->get(DashboardService::class),
+            $c->get(Database::class),
+            $basePath . '/storage/reportes',
         ));
 
         // Forzar inicio de sesión temprano.

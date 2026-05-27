@@ -6,6 +6,7 @@
 !/storage/reportes/.gitkeep
 /storage/cache/previews/*
 !/storage/cache/previews/.gitkeep
+/storage/cache/mpdf/
 /storage/backups/*
 !/storage/backups/.gitkeep
 .DS_Store
