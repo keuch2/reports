@@ -1,0 +1,11 @@
+RewriteEngine On
+
+# Redirigir todo hacia index.php excepto archivos/directorios reales
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L]
+
+# Bloquear acceso a archivos sensibles
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
