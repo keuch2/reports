@@ -23,6 +23,7 @@ final class AuthService
     public function __construct(
         private readonly Database $db,
         private readonly Session $session,
+        private readonly ?AuditService $audit = null,
     ) {
     }
 
@@ -39,6 +40,7 @@ final class AuthService
     {
         if ($this->estaBloqueado($correo, $ip)) {
             $this->registrarIntento($correo, $ip, $userAgent, false);
+            $this->audit?->registrar('auth.login_bloqueado', null, $ip, $userAgent, 'usuario', $correo);
 
             return null;
         }
@@ -51,12 +53,16 @@ final class AuthService
 
         if ($row === null || (int) $row['activo'] !== 1) {
             $this->registrarIntento($correo, $ip, $userAgent, false);
+            $this->audit?->registrar('auth.login_fallido', null, $ip, $userAgent, 'usuario', $correo,
+                ['motivo' => $row === null ? 'no_existe' : 'inactivo']);
 
             return null;
         }
 
         if (!password_verify($password, (string) $row['password_hash'])) {
             $this->registrarIntento($correo, $ip, $userAgent, false);
+            $this->audit?->registrar('auth.login_fallido', null, $ip, $userAgent, 'usuario', $correo,
+                ['motivo' => 'password_incorrecto']);
 
             return null;
         }
@@ -80,6 +86,33 @@ final class AuthService
         $this->session->set('usuario_id', $usuario->id);
         $this->session->set('usuario_rol', $usuario->rol);
         $this->session->set('usuario_cliente_id', $usuario->clienteId);
+
+        $this->audit?->registrar('auth.login_ok', $usuario, $ip, $userAgent, 'usuario', (string) $usuario->id);
+
+        return $usuario;
+    }
+
+    /**
+     * Establece la sesión autenticada para un usuario verificado por otro mecanismo (ej. 2FA post-login).
+     * No registra intento ni audita login_ok (eso ya pasó en intentarLogin).
+     */
+    public function forzarLoginPorId(int $usuarioId): ?Usuario
+    {
+        $row = $this->db->selectOne(
+            'SELECT id, correo, nombre_completo, rol, cliente_id, activo
+               FROM usuarios WHERE id = :id LIMIT 1',
+            ['id' => $usuarioId]
+        );
+        if ($row === null || (int) $row['activo'] !== 1) {
+            return null;
+        }
+
+        $usuario = Usuario::fromRow($row);
+        $this->session->regenerate();
+        $this->session->set('usuario_id', $usuario->id);
+        $this->session->set('usuario_rol', $usuario->rol);
+        $this->session->set('usuario_cliente_id', $usuario->clienteId);
+        $this->audit?->registrar('auth.2fa_ok', $usuario, null, null, 'usuario', (string) $usuario->id);
 
         return $usuario;
     }
@@ -108,6 +141,10 @@ final class AuthService
 
     public function logout(): void
     {
+        $usuario = $this->usuarioActual();
+        if ($usuario !== null) {
+            $this->audit?->registrar('auth.logout', $usuario);
+        }
         $this->session->destroy();
     }
 

@@ -23,6 +23,11 @@
             </label>
             <p class="muted">Se incluirán en el reporte si la plantilla tiene la sección de comentarios.</p>
 
+            <label style="display:flex;gap:0.5rem;align-items:center;cursor:pointer">
+                <input type="checkbox" name="marca_de_agua" value="1">
+                <span>Marca de agua "CONFIDENCIAL" en el PDF</span>
+            </label>
+
             <div class="form-actions">
                 <a href="/cliente" class="btn btn--link">Cancelar</a>
                 <button type="submit" class="btn btn--primary">📄 Descargar PDF</button>

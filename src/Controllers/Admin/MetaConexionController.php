@@ -11,6 +11,7 @@ use MisterCo\Reports\Core\Session;
 use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\CuentaPublicitariaRepository;
+use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\Meta\MetaApiException;
 use MisterCo\Reports\Services\Meta\MetaTokenService;
 
@@ -63,6 +64,10 @@ final class MetaConexionController
         }
 
         $tokenService->guardarToken($token, $usuario->id);
+        $this->container->get(AuditService::class)->registrar(
+            'meta.token_conectado', $usuario, $request->ip, $request->userAgent, 'meta_token', null,
+            ['cuentas_descubiertas' => count($cuentasMeta)]
+        );
 
         $importadas = 0;
         foreach ($cuentasMeta as $c) {
@@ -84,7 +89,12 @@ final class MetaConexionController
 
     public function desconectar(Request $request): Response
     {
+        /** @var \MisterCo\Reports\Domain\Usuario $usuario */
+        $usuario = $request->attributes['usuario'];
         $this->container->get(MetaTokenService::class)->borrarToken();
+        $this->container->get(AuditService::class)->registrar(
+            'meta.token_desconectado', $usuario, $request->ip, $request->userAgent, 'meta_token'
+        );
         $this->container->get(Session::class)->flash('success', 'Token de Meta eliminado.');
 
         return Response::redirect('/admin/meta');

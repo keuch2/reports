@@ -10,6 +10,7 @@ use MisterCo\Reports\Core\Response;
 use MisterCo\Reports\Core\Session;
 use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Services\AuthService;
+use MisterCo\Reports\Services\TwoFactorService;
 
 final class AuthController
 {
@@ -53,6 +54,60 @@ final class AuthController
             $session->flash('error', 'Credenciales inválidas o cuenta bloqueada temporalmente.');
             $session->flash('correo', $correo);
 
+            return Response::redirect('/login');
+        }
+
+        // Si tiene 2FA activo, marcamos sesión como "pendiente de 2FA" y derivamos.
+        $twoFa = $this->container->get(TwoFactorService::class);
+        if ($twoFa->estaHabilitado($usuario->id)) {
+            $session->set('2fa_pendiente_usuario_id', $usuario->id);
+            // Limpiamos las claves que marcan sesión como autenticada hasta validar el código.
+            $session->forget('usuario_id');
+            $session->forget('usuario_rol');
+            $session->forget('usuario_cliente_id');
+
+            return Response::redirect('/2fa');
+        }
+
+        return $this->redirectToHome($auth);
+    }
+
+    public function mostrar2fa(Request $request): Response
+    {
+        $session = $this->container->get(Session::class);
+        if (!$session->has('2fa_pendiente_usuario_id')) {
+            return Response::redirect('/login');
+        }
+        $view = $this->container->get(View::class);
+
+        return Response::html($view->render('auth/2fa_login', [
+            'error' => $session->getFlash('error'),
+        ], 'layouts/auth'));
+    }
+
+    public function procesar2fa(Request $request): Response
+    {
+        $session = $this->container->get(Session::class);
+        $usuarioId = (int) $session->get('2fa_pendiente_usuario_id', 0);
+        if ($usuarioId === 0) {
+            return Response::redirect('/login');
+        }
+
+        $codigo = (string) $request->input('codigo', '');
+        $twoFa = $this->container->get(TwoFactorService::class);
+
+        if (!$twoFa->verificarLogin($usuarioId, $codigo)) {
+            $session->flash('error', 'Código inválido. Probá de nuevo.');
+
+            return Response::redirect('/2fa');
+        }
+
+        // Completar autenticación.
+        $auth = $this->container->get(AuthService::class);
+        $usuario = $auth->forzarLoginPorId($usuarioId);
+        $session->forget('2fa_pendiente_usuario_id');
+
+        if ($usuario === null) {
             return Response::redirect('/login');
         }
 

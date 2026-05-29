@@ -11,6 +11,8 @@
         <a href="/admin/importar" class="<?= $seccion === 'importar' ? 'active' : '' ?>">Importar</a>
         <a href="/admin/clientes" class="<?= $seccion === 'clientes' ? 'active' : '' ?>">Clientes</a>
         <a href="/admin/plantillas" class="<?= $seccion === 'plantillas' ? 'active' : '' ?>">Plantillas</a>
+        <a href="/admin/auditoria" class="<?= $seccion === 'auditoria' ? 'active' : '' ?>">Auditoría</a>
+        <a href="/admin/2fa" class="<?= $seccion === '2fa' ? 'active' : '' ?>">2FA</a>
     </nav>
     <div class="shell__user">
         <span><?= $view->e($usuario->nombreCompleto) ?></span>

@@ -43,10 +43,13 @@
                     <input class="field__input" type="email" name="usuario_correo" required>
                 </label>
                 <label class="field">
-                    <span class="field__label">Contraseña inicial * (mín. 8 caracteres)</span>
-                    <input class="field__input" type="text" name="usuario_password" required minlength="8">
+                    <span class="field__label">Contraseña inicial *</span>
+                    <input class="field__input" type="text" name="usuario_password" required minlength="12">
                 </label>
-                <p class="muted">Compartila por canal seguro. El cliente podrá cambiarla luego.</p>
+                <p class="muted">
+                    Mín. 12 caracteres con mayúscula, minúscula, número y carácter especial.
+                    Compartila por canal seguro. El cliente podrá cambiarla luego.
+                </p>
             </fieldset>
 
             <div class="form-actions">

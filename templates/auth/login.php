@@ -34,6 +34,8 @@
     </form>
 
     <footer class="auth-card__footer">
+        <a href="/password/solicitar">¿Olvidaste tu contraseña?</a>
+        <br><br>
         <small>© <?= date('Y') ?> Mister Co. · mister.com.py</small>
     </footer>
 </div>

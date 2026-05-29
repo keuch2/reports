@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use MisterCo\Reports\Controllers\Admin\AuditoriaController;
 use MisterCo\Reports\Controllers\Admin\ClienteController as AdminClienteController;
+use MisterCo\Reports\Controllers\Admin\DosFactorController;
 use MisterCo\Reports\Controllers\Admin\ImportacionController;
+use MisterCo\Reports\Controllers\Admin\ImportacionHistoricoController;
 use MisterCo\Reports\Controllers\Admin\MetaConexionController;
 use MisterCo\Reports\Controllers\Admin\PermisosController;
 use MisterCo\Reports\Controllers\Admin\PlantillaPdfController;
@@ -13,6 +16,7 @@ use MisterCo\Reports\Controllers\Cliente\DashboardController as ClienteDashboard
 use MisterCo\Reports\Controllers\Cliente\PreferenciasController as ClientePreferenciasController;
 use MisterCo\Reports\Controllers\Cliente\ReporteController as ClienteReporteController;
 use MisterCo\Reports\Controllers\HomeController;
+use MisterCo\Reports\Controllers\PasswordResetController;
 use MisterCo\Reports\Core\Router;
 use MisterCo\Reports\Middleware\AdminMiddleware;
 use MisterCo\Reports\Middleware\ClienteMiddleware;
@@ -24,6 +28,16 @@ return function (Router $router): void {
     $router->get('/login', [AuthController::class, 'mostrarLogin']);
     $router->post('/login', [AuthController::class, 'procesarLogin'], [CsrfMiddleware::class]);
     $router->post('/logout', [AuthController::class, 'logout'], [CsrfMiddleware::class]);
+
+    // Recuperación de contraseña (público).
+    $router->get('/password/solicitar', [PasswordResetController::class, 'mostrarSolicitud']);
+    $router->post('/password/solicitar', [PasswordResetController::class, 'procesarSolicitud'], [CsrfMiddleware::class]);
+    $router->get('/password/reset', [PasswordResetController::class, 'mostrarReset']);
+    $router->post('/password/reset', [PasswordResetController::class, 'procesarReset'], [CsrfMiddleware::class]);
+
+    // 2FA step (entre login y autenticado).
+    $router->get('/2fa', [AuthController::class, 'mostrar2fa']);
+    $router->post('/2fa', [AuthController::class, 'procesar2fa'], [CsrfMiddleware::class]);
 
     // --- Admin ---
     $admin = [AdminMiddleware::class];
@@ -58,6 +72,16 @@ return function (Router $router): void {
     $router->get('/admin/plantillas/{id}/editar', [PlantillaPdfController::class, 'mostrarFormulario'], $admin);
     $router->post('/admin/plantillas/{id}', [PlantillaPdfController::class, 'guardar'], $adminCsrf);
     $router->post('/admin/plantillas/{id}/eliminar', [PlantillaPdfController::class, 'eliminar'], $adminCsrf);
+
+    // Auditoría y operación
+    $router->get('/admin/auditoria', [AuditoriaController::class, 'listar'], $admin);
+    $router->get('/admin/importaciones', [ImportacionHistoricoController::class, 'listar'], $admin);
+
+    // 2FA admin
+    $router->get('/admin/2fa', [DosFactorController::class, 'mostrar'], $admin);
+    $router->post('/admin/2fa/iniciar', [DosFactorController::class, 'iniciar'], $adminCsrf);
+    $router->post('/admin/2fa/confirmar', [DosFactorController::class, 'confirmar'], $adminCsrf);
+    $router->post('/admin/2fa/deshabilitar', [DosFactorController::class, 'deshabilitar'], $adminCsrf);
 
     // --- Cliente ---
     $cliente = [ClienteMiddleware::class];

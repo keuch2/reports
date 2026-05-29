@@ -12,6 +12,7 @@ use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\CuentaPublicitariaRepository;
 use MisterCo\Reports\Repositories\ImportacionRepository;
+use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\Meta\ImportacionService;
 use MisterCo\Reports\Services\Meta\MetaApiException;
 use MisterCo\Reports\Services\Meta\MetaTokenService;
@@ -77,9 +78,15 @@ final class ImportacionController
         set_time_limit(0);
         ignore_user_abort(true);
 
+        $audit = $this->container->get(AuditService::class);
+        $audit->registrar('importacion.iniciada', $usuario, $request->ip, $request->userAgent,
+            'cuenta_publicitaria', (string) $cuentaId, ['rango' => "{$rangoInicio} a {$rangoFin}"]);
+
         try {
             $service = $this->container->get(ImportacionService::class);
             $r = $service->importar($cuentaId, $rangoInicio, $rangoFin, $usuario->id);
+            $audit->registrar('importacion.completada', $usuario, $request->ip, $request->userAgent,
+                'importacion', (string) $r['importacion_id'], $r);
             $session->flash('success', sprintf(
                 'Importación #%d completada: %d campañas, %d adsets, %d anuncios, %d snapshots.',
                 $r['importacion_id'], $r['campanias'], $r['adsets'], $r['anuncios'], $r['snapshots']
@@ -88,8 +95,12 @@ final class ImportacionController
             $msg = $e->esTokenInvalido()
                 ? 'El token de Meta es inválido o expiró. Reconectá la cuenta.'
                 : 'Meta API: ' . $e->getMessage();
+            $audit->registrar('importacion.fallida', $usuario, $request->ip, $request->userAgent,
+                'cuenta_publicitaria', (string) $cuentaId, ['error' => $e->getMessage(), 'token_invalido' => $e->esTokenInvalido()]);
             $session->flash('error', $msg);
         } catch (Throwable $e) {
+            $audit->registrar('importacion.fallida', $usuario, $request->ip, $request->userAgent,
+                'cuenta_publicitaria', (string) $cuentaId, ['error' => $e->getMessage()]);
             $session->flash('error', 'Fallo en la importación: ' . $e->getMessage());
         }
 

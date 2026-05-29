@@ -35,6 +35,7 @@ final class ReportePdfService
         int $generadoPorUsuarioId,
         array $secciones = [],
         ?string $comentarios = null,
+        bool $marcaDeAgua = false,
     ): array {
         $cuenta = $this->buscarCuenta($cuentaId);
         $cliente = $this->buscarCliente($clienteId);
@@ -74,6 +75,13 @@ final class ReportePdfService
         $mpdf->SetAuthor('Mister Co.');
         $mpdf->SetCreator('Mister Co. Reports');
         $mpdf->SetHTMLFooter('<div style="text-align:center;color:#999;font-size:9pt">Mister Co. · mister.com.py · Página {PAGENO}/{nbpg}</div>');
+
+        if ($marcaDeAgua) {
+            $mpdf->SetWatermarkText('CONFIDENCIAL — ' . mb_strtoupper((string) $cliente['nombre_comercial']));
+            $mpdf->showWatermarkText = true;
+            $mpdf->watermark_font = 'DejaVuSans';
+            $mpdf->watermarkTextAlpha = 0.08;
+        }
 
         $mpdf->WriteHTML($html);
 

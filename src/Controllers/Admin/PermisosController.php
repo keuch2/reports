@@ -12,6 +12,7 @@ use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Repositories\ClienteRepository;
 use MisterCo\Reports\Repositories\EntidadesMetaRepository;
 use MisterCo\Reports\Repositories\MetricaCatalogoRepository;
+use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\PermisosService;
 
 final class PermisosController
@@ -78,6 +79,8 @@ final class PermisosController
 
     public function guardarCampanias(Request $request): Response
     {
+        /** @var \MisterCo\Reports\Domain\Usuario $usuario */
+        $usuario = $request->attributes['usuario'];
         $clienteId = (int) ($request->attributes['id'] ?? 0);
         $cuentaId = (int) $request->input('cuenta_id', 0);
         $ocultas = array_map('intval', (array) ($request->post['ocultas'] ?? []));
@@ -85,6 +88,10 @@ final class PermisosController
         $this->container->get(PermisosService::class)
             ->reemplazarCampaniasOcultas($clienteId, $cuentaId, $ocultas);
 
+        $this->container->get(AuditService::class)->registrar(
+            'permisos.campanias_actualizadas', $usuario, $request->ip, $request->userAgent,
+            'cliente', (string) $clienteId, ['cuenta_id' => $cuentaId, 'campanias_ocultas' => $ocultas]
+        );
         $this->container->get(Session::class)->flash('success',
             count($ocultas) . ' campaña(s) marcadas como ocultas.');
 
@@ -93,6 +100,8 @@ final class PermisosController
 
     public function guardarAnuncios(Request $request): Response
     {
+        /** @var \MisterCo\Reports\Domain\Usuario $usuario */
+        $usuario = $request->attributes['usuario'];
         $clienteId = (int) ($request->attributes['id'] ?? 0);
         $cuentaId = (int) $request->input('cuenta_id', 0);
         $campaniaId = (int) $request->input('campania_id', 0);
@@ -101,6 +110,10 @@ final class PermisosController
         $this->container->get(PermisosService::class)
             ->reemplazarAnunciosOcultos($clienteId, $campaniaId, $ocultos);
 
+        $this->container->get(AuditService::class)->registrar(
+            'permisos.anuncios_actualizados', $usuario, $request->ip, $request->userAgent,
+            'cliente', (string) $clienteId, ['campania_id' => $campaniaId, 'anuncios_ocultos' => $ocultos]
+        );
         $this->container->get(Session::class)->flash('success',
             count($ocultos) . ' anuncio(s) marcados como ocultos en esa campaña.');
 
@@ -109,6 +122,8 @@ final class PermisosController
 
     public function guardarMetricas(Request $request): Response
     {
+        /** @var \MisterCo\Reports\Domain\Usuario $usuario */
+        $usuario = $request->attributes['usuario'];
         $clienteId = (int) ($request->attributes['id'] ?? 0);
         $cuentaId = (int) $request->input('cuenta_id', 0);
         $deshabilitadas = array_map('intval', (array) ($request->post['deshabilitadas'] ?? []));
@@ -116,6 +131,10 @@ final class PermisosController
         $this->container->get(PermisosService::class)
             ->reemplazarMetricasDeshabilitadas($clienteId, $deshabilitadas);
 
+        $this->container->get(AuditService::class)->registrar(
+            'permisos.metricas_actualizadas', $usuario, $request->ip, $request->userAgent,
+            'cliente', (string) $clienteId, ['metricas_deshabilitadas' => $deshabilitadas]
+        );
         $this->container->get(Session::class)->flash('success',
             count($deshabilitadas) . ' métrica(s) marcadas como deshabilitadas.');
 

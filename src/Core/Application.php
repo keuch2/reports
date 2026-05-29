@@ -13,13 +13,18 @@ use MisterCo\Reports\Repositories\ImportacionRepository;
 use MisterCo\Reports\Repositories\MetricaCatalogoRepository;
 use MisterCo\Reports\Repositories\MetricaSnapshotRepository;
 use MisterCo\Reports\Repositories\PlantillaPdfRepository;
+use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\AuthService;
 use MisterCo\Reports\Services\DashboardPreferenciasService;
 use MisterCo\Reports\Services\DashboardService;
 use MisterCo\Reports\Services\Meta\ImportacionService;
 use MisterCo\Reports\Services\Meta\MetaTokenService;
+use MisterCo\Reports\Services\PasswordPolicyService;
+use MisterCo\Reports\Services\PasswordResetService;
 use MisterCo\Reports\Services\PermisosService;
 use MisterCo\Reports\Services\ReportePdfService;
+use MisterCo\Reports\Services\TotpService;
+use MisterCo\Reports\Services\TwoFactorService;
 use Throwable;
 
 final class Application
@@ -56,9 +61,11 @@ final class Application
             $basePath . '/templates',
             $c->get(Session::class),
         ));
+        $container->bind(AuditService::class, fn (Container $c) => new AuditService($c->get(Database::class)));
         $container->bind(AuthService::class, fn (Container $c) => new AuthService(
             $c->get(Database::class),
             $c->get(Session::class),
+            $c->get(AuditService::class),
         ));
         $container->bind(Encryptor::class, fn () => new Encryptor((string) ($appConfig['key'] ?? '')));
         $container->bind(ConfiguracionRepository::class, fn (Container $c) => new ConfiguracionRepository(
@@ -98,6 +105,30 @@ final class Application
             $c->get(DashboardService::class),
             $c->get(Database::class),
             $basePath . '/storage/reportes',
+        ));
+
+        // Fase 3
+        $container->bind(PasswordPolicyService::class, fn () => new PasswordPolicyService());
+        $container->bind(PasswordResetService::class, fn (Container $c) => new PasswordResetService(
+            $c->get(Database::class),
+            $c->get(PasswordPolicyService::class),
+            $c->get(AuditService::class),
+            [
+                'host' => $_ENV['SMTP_HOST'] ?? '',
+                'port' => (int) ($_ENV['SMTP_PORT'] ?? 587),
+                'username' => $_ENV['SMTP_USERNAME'] ?? '',
+                'password' => $_ENV['SMTP_PASSWORD'] ?? '',
+                'from_address' => $_ENV['SMTP_FROM_ADDRESS'] ?? '',
+                'from_name' => $_ENV['SMTP_FROM_NAME'] ?? 'Mister Co. Reports',
+            ],
+            (string) ($appConfig['url'] ?? 'http://localhost'),
+        ));
+        $container->bind(TotpService::class, fn () => new TotpService());
+        $container->bind(TwoFactorService::class, fn (Container $c) => new TwoFactorService(
+            $c->get(Database::class),
+            $c->get(Encryptor::class),
+            $c->get(TotpService::class),
+            $c->get(AuditService::class),
         ));
 
         // Forzar inicio de sesión temprano.

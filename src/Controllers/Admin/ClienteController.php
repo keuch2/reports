@@ -12,6 +12,8 @@ use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\ClienteRepository;
 use MisterCo\Reports\Repositories\CuentaPublicitariaRepository;
+use MisterCo\Reports\Services\AuditService;
+use MisterCo\Reports\Services\PasswordPolicyService;
 
 final class ClienteController
 {
@@ -63,8 +65,9 @@ final class ClienteController
 
             return Response::redirect('/admin/clientes/nuevo');
         }
-        if (strlen($usuarioPassword) < 8) {
-            $session->flash('error', 'La contraseña debe tener al menos 8 caracteres.');
+        $erroresPwd = $this->container->get(PasswordPolicyService::class)->validar($usuarioPassword);
+        if ($erroresPwd !== []) {
+            $session->flash('error', 'Contraseña inválida: ' . implode(' ', $erroresPwd));
 
             return Response::redirect('/admin/clientes/nuevo');
         }
@@ -74,6 +77,11 @@ final class ClienteController
 
         $hash = password_hash($usuarioPassword, PASSWORD_ARGON2ID, ['memory_cost' => 65536, 'time_cost' => 4, 'threads' => 2]);
         $repo->crearUsuarioPrimario($clienteId, $usuarioCorreo, $hash, $usuarioNombre);
+
+        $this->container->get(AuditService::class)->registrar(
+            'cliente.creado', $admin, $request->ip, $request->userAgent,
+            'cliente', (string) $clienteId, ['nombre' => $nombre, 'usuario_correo' => $usuarioCorreo]
+        );
 
         $session->flash('success', "Cliente {$nombre} creado con usuario {$usuarioCorreo}.");
 
@@ -113,6 +121,10 @@ final class ClienteController
 
         if ($clienteId > 0 && $cuentaId > 0) {
             $this->container->get(ClienteRepository::class)->asignarCuenta($clienteId, $cuentaId, $admin->id);
+            $this->container->get(AuditService::class)->registrar(
+                'cliente.cuenta_asignada', $admin, $request->ip, $request->userAgent,
+                'cliente', (string) $clienteId, ['cuenta_id' => $cuentaId]
+            );
             $this->container->get(Session::class)->flash('success', 'Cuenta asignada.');
         }
 
@@ -121,11 +133,17 @@ final class ClienteController
 
     public function desasignarCuenta(Request $request): Response
     {
+        /** @var Usuario $admin */
+        $admin = $request->attributes['usuario'];
         $clienteId = (int) ($request->attributes['id'] ?? 0);
         $cuentaId = (int) $request->input('cuenta_id', 0);
 
         if ($clienteId > 0 && $cuentaId > 0) {
             $this->container->get(ClienteRepository::class)->desasignarCuenta($clienteId, $cuentaId);
+            $this->container->get(AuditService::class)->registrar(
+                'cliente.cuenta_desasignada', $admin, $request->ip, $request->userAgent,
+                'cliente', (string) $clienteId, ['cuenta_id' => $cuentaId]
+            );
             $this->container->get(Session::class)->flash('success', 'Cuenta desasignada.');
         }
 

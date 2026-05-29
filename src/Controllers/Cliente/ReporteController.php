@@ -10,6 +10,7 @@ use MisterCo\Reports\Core\Response;
 use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\PlantillaPdfRepository;
+use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\DashboardService;
 use MisterCo\Reports\Services\ReportePdfService;
 
@@ -62,6 +63,7 @@ final class ReporteController
         );
 
         $comentarios = trim((string) $request->input('comentarios', ''));
+        $marcaDeAgua = filter_var($request->input('marca_de_agua', false), FILTER_VALIDATE_BOOLEAN);
 
         // Resolver plantilla aplicable al cliente (específica o genérica).
         $plantillaRepo = $this->container->get(PlantillaPdfRepository::class);
@@ -69,7 +71,14 @@ final class ReporteController
         $secciones = $plantilla !== null ? PlantillaPdfRepository::seccionesDe($plantilla) : [];
 
         $pdf = $this->container->get(ReportePdfService::class)
-            ->generar($clienteId, $cuentaId, $desde, $hasta, $usuario->id, $secciones, $comentarios !== '' ? $comentarios : null);
+            ->generar($clienteId, $cuentaId, $desde, $hasta, $usuario->id, $secciones,
+                $comentarios !== '' ? $comentarios : null, $marcaDeAgua);
+
+        $this->container->get(AuditService::class)->registrar(
+            'pdf.generado', $usuario, $request->ip, $request->userAgent,
+            'reporte_pdf', (string) ($pdf['nombre'] ?? ''),
+            ['cuenta_id' => $cuentaId, 'rango' => "{$desde} a {$hasta}", 'tamanio' => $pdf['tamanio'] ?? 0]
+        );
 
         $contenido = (string) file_get_contents($pdf['ruta']);
 
