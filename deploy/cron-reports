@@ -1,0 +1,27 @@
+# Mister Co. Reports — cron de producción
+# ----------------------------------------------------------------------------
+# Instalar como www-data:
+#   sudo crontab -u www-data /var/www/reports/deploy/cron-reports
+# o copiar individualmente:
+#   sudo cp /var/www/reports/deploy/cron-reports /etc/cron.d/reports
+#   (en /etc/cron.d agregar usuario antes del comando: ej. "0 3 * * * www-data ...")
+#
+# Zona horaria: el sistema; se asume America/Asuncion configurado a nivel OS.
+# Verificá:   timedatectl   y ajustá:   sudo timedatectl set-timezone America/Asuncion
+# ----------------------------------------------------------------------------
+
+APP_DIR=/var/www/reports
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# m  h  dom mon dow  command
+# --- 03:00 — Limpiar PDFs y caché temporales > 180 días ---
+0 3 * * *  find $APP_DIR/storage/reportes -type f -name '*.pdf' -mtime +180 -delete; \
+           find $APP_DIR/storage/cache/previews -type f -mtime +30 -delete; \
+           find $APP_DIR/storage/logs -type f -name '*.log' -mtime +60 -delete
+
+# --- 04:00 — Backup BD + PDFs ---
+0 4 * * *  $APP_DIR/bin/backup.sh >> $APP_DIR/storage/logs/backup.log 2>&1
+
+# NOTA: NO hay cron de sincronización Meta. La importación es manual on-demand
+# por decisión arquitectónica (ver plan: el cliente sólo lee datos persistidos).
