@@ -10,11 +10,15 @@ use MisterCo\Reports\Repositories\ConfiguracionRepository;
 use MisterCo\Reports\Repositories\CuentaPublicitariaRepository;
 use MisterCo\Reports\Repositories\EntidadesMetaRepository;
 use MisterCo\Reports\Repositories\ImportacionRepository;
+use MisterCo\Reports\Repositories\MetricaCatalogoRepository;
 use MisterCo\Reports\Repositories\MetricaSnapshotRepository;
+use MisterCo\Reports\Repositories\PlantillaPdfRepository;
 use MisterCo\Reports\Services\AuthService;
+use MisterCo\Reports\Services\DashboardPreferenciasService;
 use MisterCo\Reports\Services\DashboardService;
 use MisterCo\Reports\Services\Meta\ImportacionService;
 use MisterCo\Reports\Services\Meta\MetaTokenService;
+use MisterCo\Reports\Services\PermisosService;
 use MisterCo\Reports\Services\ReportePdfService;
 use Throwable;
 
@@ -72,8 +76,11 @@ final class Application
         $container->bind(EntidadesMetaRepository::class, fn (Container $c) => new EntidadesMetaRepository($c->get(Database::class)));
         $container->bind(MetricaSnapshotRepository::class, fn (Container $c) => new MetricaSnapshotRepository($c->get(Database::class)));
         $container->bind(ImportacionRepository::class, fn (Container $c) => new ImportacionRepository($c->get(Database::class)));
+        $container->bind(MetricaCatalogoRepository::class, fn (Container $c) => new MetricaCatalogoRepository($c->get(Database::class)));
+        $container->bind(PlantillaPdfRepository::class, fn (Container $c) => new PlantillaPdfRepository($c->get(Database::class)));
 
         // Servicios de dominio
+        $container->bind(PermisosService::class, fn (Container $c) => new PermisosService($c->get(Database::class)));
         $container->bind(ImportacionService::class, fn (Container $c) => new ImportacionService(
             $c->get(MetaTokenService::class),
             $c->get(CuentaPublicitariaRepository::class),
@@ -81,7 +88,11 @@ final class Application
             $c->get(MetricaSnapshotRepository::class),
             $c->get(ImportacionRepository::class),
         ));
-        $container->bind(DashboardService::class, fn (Container $c) => new DashboardService($c->get(Database::class)));
+        $container->bind(DashboardService::class, fn (Container $c) => new DashboardService(
+            $c->get(Database::class),
+            $c->get(PermisosService::class),
+        ));
+        $container->bind(DashboardPreferenciasService::class, fn (Container $c) => new DashboardPreferenciasService($c->get(Database::class)));
         $container->bind(ReportePdfService::class, fn (Container $c) => new ReportePdfService(
             $c->get(View::class),
             $c->get(DashboardService::class),

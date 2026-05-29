@@ -7,7 +7,9 @@ namespace MisterCo\Reports\Controllers\Cliente;
 use MisterCo\Reports\Core\Container;
 use MisterCo\Reports\Core\Request;
 use MisterCo\Reports\Core\Response;
+use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Domain\Usuario;
+use MisterCo\Reports\Repositories\PlantillaPdfRepository;
 use MisterCo\Reports\Services\DashboardService;
 use MisterCo\Reports\Services\ReportePdfService;
 
@@ -15,6 +17,30 @@ final class ReporteController
 {
     public function __construct(private readonly Container $container)
     {
+    }
+
+    /** Vista previa con comentario editable antes de generar el PDF. */
+    public function previa(Request $request): Response
+    {
+        /** @var Usuario $usuario */
+        $usuario = $request->attributes['usuario'];
+        $clienteId = (int) $usuario->clienteId;
+        $cuentaId = (int) $request->input('cuenta_id', 0);
+
+        $dashboard = $this->container->get(DashboardService::class);
+        if (!$dashboard->clienteTieneAccesoACuenta($clienteId, $cuentaId)) {
+            return Response::html('<h1>403 — Sin acceso a esa cuenta.</h1>', 403);
+        }
+
+        $preset = (string) $request->input('preset', 'ultimos_30_dias');
+        $view = $this->container->get(View::class);
+
+        return Response::html($view->render('cliente/reporte_previa', [
+            'usuario' => $usuario,
+            'titulo' => 'Generar reporte',
+            'cuenta_id' => $cuentaId,
+            'preset' => $preset,
+        ]));
     }
 
     public function descargar(Request $request): Response
@@ -35,8 +61,15 @@ final class ReporteController
             (string) $request->input('hasta', ''),
         );
 
+        $comentarios = trim((string) $request->input('comentarios', ''));
+
+        // Resolver plantilla aplicable al cliente (específica o genérica).
+        $plantillaRepo = $this->container->get(PlantillaPdfRepository::class);
+        $plantilla = $plantillaRepo->paraCliente($clienteId);
+        $secciones = $plantilla !== null ? PlantillaPdfRepository::seccionesDe($plantilla) : [];
+
         $pdf = $this->container->get(ReportePdfService::class)
-            ->generar($clienteId, $cuentaId, $desde, $hasta, $usuario->id);
+            ->generar($clienteId, $cuentaId, $desde, $hasta, $usuario->id, $secciones, $comentarios !== '' ? $comentarios : null);
 
         $contenido = (string) file_get_contents($pdf['ruta']);
 

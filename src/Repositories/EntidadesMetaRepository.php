@@ -120,4 +120,42 @@ final class EntidadesMetaRepository
 
         return $row !== null ? (int) $row['id'] : null;
     }
+
+    /** @return list<array<string,mixed>> Todas las campañas de una cuenta (sin filtro de permisos) */
+    public function campaniasDeCuenta(int $cuentaId): array
+    {
+        return $this->db->select(
+            'SELECT id, meta_campaign_id, nombre, objetivo, estado, fecha_inicio, fecha_fin
+               FROM campanias WHERE cuenta_publicitaria_id = :c ORDER BY nombre',
+            ['c' => $cuentaId]
+        );
+    }
+
+    /** @return list<array<string,mixed>> Todos los anuncios de una campaña con su adset */
+    public function anunciosDeCampania(int $campaniaId): array
+    {
+        return $this->db->select(
+            'SELECT a.id, a.meta_ad_id, a.nombre, a.tipo, a.thumbnail_url, a.estado,
+                    cs.nombre AS adset_nombre, cs.id AS adset_id
+               FROM anuncios a
+               JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
+              WHERE cs.campania_id = :c
+           ORDER BY cs.nombre, a.nombre',
+            ['c' => $campaniaId]
+        );
+    }
+
+    /** @return array<string,mixed>|null */
+    public function buscarCampania(int $campaniaId): ?array
+    {
+        return $this->db->selectOne(
+            'SELECT c.id, c.meta_campaign_id, c.nombre, c.objetivo, c.estado,
+                    c.fecha_inicio, c.fecha_fin, c.presupuesto_diario, c.presupuesto_total,
+                    c.cuenta_publicitaria_id, cp.nombre AS cuenta_nombre, cp.moneda
+               FROM campanias c
+               JOIN cuentas_publicitarias cp ON cp.id = c.cuenta_publicitaria_id
+              WHERE c.id = :id',
+            ['id' => $campaniaId]
+        );
+    }
 }

@@ -4,6 +4,10 @@
 ?>
 <header class="shell__header">
     <div class="shell__brand">Mister Co. · Reportes</div>
+    <nav class="shell__nav">
+        <a href="/cliente">Dashboard</a>
+        <a href="/cliente/preferencias">Preferencias</a>
+    </nav>
     <div class="shell__user">
         <span><?= $view->e($usuario->nombreCompleto) ?></span>
         <form method="POST" action="/logout" class="logout-form">

@@ -5,8 +5,12 @@ declare(strict_types=1);
 use MisterCo\Reports\Controllers\Admin\ClienteController as AdminClienteController;
 use MisterCo\Reports\Controllers\Admin\ImportacionController;
 use MisterCo\Reports\Controllers\Admin\MetaConexionController;
+use MisterCo\Reports\Controllers\Admin\PermisosController;
+use MisterCo\Reports\Controllers\Admin\PlantillaPdfController;
 use MisterCo\Reports\Controllers\AuthController;
+use MisterCo\Reports\Controllers\Cliente\CampaniaController as ClienteCampaniaController;
 use MisterCo\Reports\Controllers\Cliente\DashboardController as ClienteDashboardController;
+use MisterCo\Reports\Controllers\Cliente\PreferenciasController as ClientePreferenciasController;
 use MisterCo\Reports\Controllers\Cliente\ReporteController as ClienteReporteController;
 use MisterCo\Reports\Controllers\HomeController;
 use MisterCo\Reports\Core\Router;
@@ -41,9 +45,28 @@ return function (Router $router): void {
     $router->post('/admin/clientes/{id}/asignar', [AdminClienteController::class, 'asignarCuenta'], $adminCsrf);
     $router->post('/admin/clientes/{id}/desasignar', [AdminClienteController::class, 'desasignarCuenta'], $adminCsrf);
 
+    // Permisos granulares por cliente
+    $router->get('/admin/clientes/{id}/permisos', [PermisosController::class, 'mostrar'], $admin);
+    $router->post('/admin/clientes/{id}/permisos/campanias', [PermisosController::class, 'guardarCampanias'], $adminCsrf);
+    $router->post('/admin/clientes/{id}/permisos/anuncios', [PermisosController::class, 'guardarAnuncios'], $adminCsrf);
+    $router->post('/admin/clientes/{id}/permisos/metricas', [PermisosController::class, 'guardarMetricas'], $adminCsrf);
+
+    // Plantillas PDF
+    $router->get('/admin/plantillas', [PlantillaPdfController::class, 'listar'], $admin);
+    $router->get('/admin/plantillas/nueva', [PlantillaPdfController::class, 'mostrarFormulario'], $admin);
+    $router->post('/admin/plantillas', [PlantillaPdfController::class, 'guardar'], $adminCsrf);
+    $router->get('/admin/plantillas/{id}/editar', [PlantillaPdfController::class, 'mostrarFormulario'], $admin);
+    $router->post('/admin/plantillas/{id}', [PlantillaPdfController::class, 'guardar'], $adminCsrf);
+    $router->post('/admin/plantillas/{id}/eliminar', [PlantillaPdfController::class, 'eliminar'], $adminCsrf);
+
     // --- Cliente ---
     $cliente = [ClienteMiddleware::class];
+    $clienteCsrf = [ClienteMiddleware::class, CsrfMiddleware::class];
 
     $router->get('/cliente', [ClienteDashboardController::class, 'index'], $cliente);
-    $router->get('/cliente/reporte.pdf', [ClienteReporteController::class, 'descargar'], $cliente);
+    $router->get('/cliente/campanias/{id}', [ClienteCampaniaController::class, 'detalle'], $cliente);
+    $router->get('/cliente/preferencias', [ClientePreferenciasController::class, 'mostrar'], $cliente);
+    $router->post('/cliente/preferencias', [ClientePreferenciasController::class, 'guardar'], $clienteCsrf);
+    $router->get('/cliente/reporte/previa', [ClienteReporteController::class, 'previa'], $cliente);
+    $router->post('/cliente/reporte.pdf', [ClienteReporteController::class, 'descargar'], $clienteCsrf);
 };

@@ -23,15 +23,25 @@ final class ReportePdfService
      *
      * @return array{ruta:string, nombre:string, tamanio:int}
      */
+    /**
+     * @param list<string> $secciones Secciones a incluir (de PlantillaPdfRepository::SECCIONES_DISPONIBLES).
+     *                                 Si vacío, se usa el set por defecto.
+     */
     public function generar(
         int $clienteId,
         int $cuentaId,
         string $desde,
         string $hasta,
         int $generadoPorUsuarioId,
+        array $secciones = [],
+        ?string $comentarios = null,
     ): array {
         $cuenta = $this->buscarCuenta($cuentaId);
         $cliente = $this->buscarCliente($clienteId);
+
+        if ($secciones === []) {
+            $secciones = ['resumen_ejecutivo', 'tabla_campanias', 'evolucion_diaria'];
+        }
 
         $totales = $this->dashboard->totalesPorCuenta($clienteId, $cuentaId, $desde, $hasta);
         $campanias = $this->dashboard->porCampania($clienteId, $cuentaId, $desde, $hasta);
@@ -45,6 +55,8 @@ final class ReportePdfService
             'totales' => $totales,
             'campanias' => $campanias,
             'evolucion' => $evolucion,
+            'secciones' => $secciones,
+            'comentarios' => $comentarios,
             'generado_en' => date('Y-m-d H:i'),
         ], layout: null);
 
@@ -79,9 +91,13 @@ final class ReportePdfService
 
         $this->db->execute(
             'INSERT INTO reportes_pdf_historico
-                (cliente_id, generado_por_usuario_id, rango_inicio, rango_fin, archivo_ruta, archivo_tamanio)
-             VALUES (:c, :u, :ri, :rf, :a, :s)',
-            ['c' => $clienteId, 'u' => $generadoPorUsuarioId, 'ri' => $desde, 'rf' => $hasta, 'a' => $ruta, 's' => $tamanio]
+                (cliente_id, generado_por_usuario_id, rango_inicio, rango_fin, archivo_ruta, archivo_tamanio, comentarios)
+             VALUES (:c, :u, :ri, :rf, :a, :s, :com)',
+            [
+                'c' => $clienteId, 'u' => $generadoPorUsuarioId, 'ri' => $desde, 'rf' => $hasta,
+                'a' => $ruta, 's' => $tamanio,
+                'com' => $comentarios !== null && $comentarios !== '' ? json_encode(['texto' => $comentarios]) : null,
+            ]
         );
 
         return ['ruta' => $ruta, 'nombre' => $nombre, 'tamanio' => $tamanio];

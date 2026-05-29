@@ -9,7 +9,9 @@ use MisterCo\Reports\Core\Request;
 use MisterCo\Reports\Core\Response;
 use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Domain\Usuario;
+use MisterCo\Reports\Services\DashboardPreferenciasService;
 use MisterCo\Reports\Services\DashboardService;
+use MisterCo\Reports\Services\PermisosService;
 
 final class DashboardController
 {
@@ -25,6 +27,7 @@ final class DashboardController
 
         $service = $this->container->get(DashboardService::class);
         $view = $this->container->get(View::class);
+        $prefs = $this->container->get(DashboardPreferenciasService::class)->obtener($clienteId);
 
         $cuentas = $service->cuentasDelCliente($clienteId);
         if ($cuentas === []) {
@@ -38,7 +41,7 @@ final class DashboardController
         $cuentaActiva = $this->elegirCuenta($cuentas, $cuentaIdSolicitada);
 
         [$desde, $hasta, $preset] = $this->resolverRango(
-            (string) $request->input('preset', 'ultimos_30_dias'),
+            (string) $request->input('preset', $prefs['rango_default']),
             (string) $request->input('desde', ''),
             (string) $request->input('hasta', ''),
         );
@@ -46,6 +49,13 @@ final class DashboardController
         $totales = $service->totalesPorCuenta($clienteId, (int) $cuentaActiva['id'], $desde, $hasta);
         $campanias = $service->porCampania($clienteId, (int) $cuentaActiva['id'], $desde, $hasta);
         $evolucion = $service->evolucionDiaria($clienteId, (int) $cuentaActiva['id'], $desde, $hasta);
+
+        $permisos = $this->container->get(PermisosService::class);
+        $deshabilitadas = $permisos->metricasDeshabilitadas($clienteId);
+        $widgetsVisibles = array_values(array_filter(
+            $prefs['widgets'],
+            static fn (string $w): bool => !in_array($w, $deshabilitadas, true)
+        ));
 
         return Response::html($view->render('cliente/dashboard_meta', [
             'usuario' => $usuario,
@@ -58,6 +68,9 @@ final class DashboardController
             'totales' => $totales,
             'campanias' => $campanias,
             'evolucion' => $evolucion,
+            'widgets_visibles' => $widgetsVisibles,
+            'widgets_disponibles' => DashboardPreferenciasService::WIDGETS_DISPONIBLES,
+            'metricas_deshabilitadas' => $deshabilitadas,
         ]));
     }
 

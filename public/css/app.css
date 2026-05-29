@@ -266,6 +266,22 @@ a { color: var(--color-primary); }
     font-variant-numeric: tabular-nums;
 }
 
+/* Widgets reordenables */
+.widgets-orden { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; gap: 0.5rem; max-width: 480px; }
+.widget-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.85rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    cursor: grab;
+}
+.widget-item.dragging { opacity: 0.4; }
+.widget-item label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; flex: 1; }
+.drag-handle { color: var(--color-muted); cursor: grab; user-select: none; font-size: 1.1rem; }
+
 details summary { cursor: pointer; color: var(--color-primary); font-size: 0.85rem; }
 details pre {
     background: #f5f5f5;

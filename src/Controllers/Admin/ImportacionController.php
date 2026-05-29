@@ -31,11 +31,19 @@ final class ImportacionController
         $importRepo = $this->container->get(ImportacionRepository::class);
         $tokenService = $this->container->get(MetaTokenService::class);
 
+        $cuentas = $cuentasRepo->listarTodas();
+        // Mapa cuenta_id => última fecha importada (para sugerir incremental).
+        $ultimasFechas = [];
+        foreach ($cuentas as $c) {
+            $ultimasFechas[(int) $c['id']] = $importRepo->ultimaFechaImportada((int) $c['id']);
+        }
+
         return Response::html($view->render('admin/importar', [
             'usuario' => $request->attributes['usuario'],
             'titulo' => 'Importar datos',
             'tiene_token' => $tokenService->tieneToken(),
-            'cuentas' => $cuentasRepo->listarTodas(),
+            'cuentas' => $cuentas,
+            'ultimas_fechas' => $ultimasFechas,
             'recientes' => $importRepo->recientes(15),
             'rango_inicio_default' => date('Y-m-d', strtotime('-30 days')),
             'rango_fin_default' => date('Y-m-d'),

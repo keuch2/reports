@@ -54,6 +54,25 @@ final class ImportacionRepository
         );
     }
 
+    /**
+     * Última fecha con snapshots importados para una cuenta (vía sus campañas).
+     * Sirve para sugerir importación incremental "solo días faltantes".
+     */
+    public function ultimaFechaImportada(int $cuentaId): ?string
+    {
+        $row = $this->db->selectOne(
+            'SELECT MAX(ms.fecha) AS ult
+               FROM metricas_snapshots ms
+               JOIN anuncios a ON a.id = ms.entidad_id AND ms.nivel = \'ad\'
+               JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
+               JOIN campanias c ON c.id = cs.campania_id
+              WHERE c.cuenta_publicitaria_id = :cuenta',
+            ['cuenta' => $cuentaId]
+        );
+
+        return $row !== null && $row['ult'] !== null ? (string) $row['ult'] : null;
+    }
+
     /** @return list<array<string, mixed>> */
     public function recientes(int $limit = 20): array
     {

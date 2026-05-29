@@ -7,7 +7,11 @@
 /** @var array<string,mixed> $totales */
 /** @var list<array<string,mixed>> $campanias */
 /** @var list<array<string,mixed>> $evolucion */
+/** @var list<string> $secciones */
+/** @var string|null $comentarios */
 /** @var string $generado_en */
+
+$incluir = static fn (string $s): bool => in_array($s, $secciones, true);
 
 $fmtMoneda = static fn ($v) => number_format((float) $v, 2, ',', '.');
 $fmtNum = static fn ($v) => number_format((float) $v, 0, ',', '.');
@@ -45,6 +49,7 @@ $mon = (string) ($cuenta['moneda'] ?? '');
 
 <pagebreak/>
 
+<?php if ($incluir('resumen_ejecutivo')): ?>
 <h2>Resumen ejecutivo</h2>
 <table class="kpi-row">
     <tr>
@@ -76,7 +81,9 @@ $mon = (string) ($cuenta['moneda'] ?? '');
         </td>
     </tr>
 </table>
+<?php endif; // resumen_ejecutivo ?>
 
+<?php if ($incluir('tabla_campanias') || $incluir('distribucion_inversion')): ?>
 <h2>Desempeño por campaña</h2>
 <?php if ($campanias === []): ?>
     <p class="muted">No se registraron datos en el rango seleccionado.</p>
@@ -108,7 +115,9 @@ $mon = (string) ($cuenta['moneda'] ?? '');
         </tbody>
     </table>
 <?php endif; ?>
+<?php endif; // tabla_campanias ?>
 
+<?php if ($incluir('evolucion_diaria')): ?>
 <h2>Evolución diaria</h2>
 <?php if ($evolucion === []): ?>
     <p class="muted">Sin datos diarios.</p>
@@ -128,4 +137,10 @@ $mon = (string) ($cuenta['moneda'] ?? '');
         <?php endforeach; ?>
         </tbody>
     </table>
+<?php endif; ?>
+<?php endif; // evolucion_diaria ?>
+
+<?php if ($incluir('comentarios') && $comentarios !== null && trim($comentarios) !== ''): ?>
+<h2>Comentarios estratégicos</h2>
+<div style="white-space:pre-wrap;font-size:10pt;line-height:1.5"><?= $view->e($comentarios) ?></div>
 <?php endif; ?>

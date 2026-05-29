@@ -37,16 +37,24 @@
                 <?= $view->csrfField() ?>
                 <label class="field">
                     <span class="field__label">Cuenta publicitaria</span>
-                    <select class="field__input" name="cuenta_id" required>
+                    <select class="field__input" name="cuenta_id" id="cuenta-select" required>
                         <option value="">— Elegí una —</option>
                         <?php foreach ($cuentas as $c): ?>
-                            <option value="<?= (int) $c['id'] ?>">
+                            <?php $ult = $ultimas_fechas[(int) $c['id']] ?? null; ?>
+                            <option value="<?= (int) $c['id'] ?>" data-ultima="<?= $view->e((string) ($ult ?? '')) ?>">
                                 <?= $view->e((string) $c['nombre']) ?>
                                 (<?= $view->e((string) $c['meta_account_id']) ?>)
+                                <?= $ult ? ' · última: ' . $view->e($ult) : ' · sin datos' ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </label>
+                <p>
+                    <button type="button" class="btn btn--link" id="btn-incremental" style="padding-left:0">
+                        ⟳ Solo días faltantes
+                    </button>
+                    <span class="muted" id="incremental-hint"></span>
+                </p>
                 <div class="field-row">
                     <label class="field">
                         <span class="field__label">Desde</span>
@@ -119,5 +127,26 @@
         const btn = document.getElementById('importar-btn');
         btn.disabled = true;
         btn.textContent = 'Importando... no cierres esta ventana';
+    });
+
+    // Importación incremental: precompletar "desde" con el día siguiente a la última fecha importada.
+    document.getElementById('btn-incremental')?.addEventListener('click', function () {
+        const select = document.getElementById('cuenta-select');
+        const opt = select.options[select.selectedIndex];
+        const hint = document.getElementById('incremental-hint');
+        if (!opt || !opt.value) { hint.textContent = 'Elegí una cuenta primero.'; return; }
+        const ultima = opt.dataset.ultima;
+        const inputDesde = document.querySelector('input[name="rango_inicio"]');
+        const inputHasta = document.querySelector('input[name="rango_fin"]');
+        const hoy = new Date().toISOString().slice(0, 10);
+        if (!ultima) {
+            hint.textContent = 'Esta cuenta no tiene datos previos; se importará el rango completo.';
+            return;
+        }
+        const d = new Date(ultima + 'T00:00:00');
+        d.setDate(d.getDate() + 1);
+        inputDesde.value = d.toISOString().slice(0, 10);
+        inputHasta.value = hoy;
+        hint.textContent = `Rango ajustado: ${inputDesde.value} → ${hoy}`;
     });
 </script>

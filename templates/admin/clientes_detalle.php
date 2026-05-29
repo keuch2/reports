@@ -14,11 +14,16 @@ $noAsignadas = array_filter($cuentas_disponibles, fn ($c) => !in_array((int) $c[
 
 <section class="shell__body">
     <p><a href="/admin/clientes">← Volver a clientes</a></p>
-    <h1><?= $view->e((string) $cliente['nombre_comercial']) ?></h1>
-    <p class="muted">
-        <?= $view->e((string) ($cliente['correo_contacto'] ?? '')) ?>
-        <?php if ($cliente['telefono']): ?> · <?= $view->e((string) $cliente['telefono']) ?><?php endif; ?>
-    </p>
+    <div class="header-row">
+        <div>
+            <h1><?= $view->e((string) $cliente['nombre_comercial']) ?></h1>
+            <p class="muted">
+                <?= $view->e((string) ($cliente['correo_contacto'] ?? '')) ?>
+                <?php if ($cliente['telefono']): ?> · <?= $view->e((string) $cliente['telefono']) ?><?php endif; ?>
+            </p>
+        </div>
+        <a href="/admin/clientes/<?= (int) $cliente['id'] ?>/permisos" class="btn btn--primary">Configurar permisos</a>
+    </div>
 
     <?php if ($error): ?><div class="alert alert--error"><?= $view->e((string) $error) ?></div><?php endif; ?>
     <?php if ($success): ?><div class="alert alert--success"><?= $view->e((string) $success) ?></div><?php endif; ?>

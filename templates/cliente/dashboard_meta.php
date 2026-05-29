@@ -45,35 +45,36 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
             </select>
         </label>
 
-        <a href="/cliente/reporte.pdf?cuenta_id=<?= (int) $cuenta_activa['id'] ?>&preset=<?= $view->e($preset) ?>"
+        <a href="/cliente/reporte/previa?cuenta_id=<?= (int) $cuenta_activa['id'] ?>&preset=<?= $view->e($preset) ?>"
            class="btn btn--primary">📄 Exportar PDF</a>
     </form>
 
+<?php
+    $mon = (string) ($cuenta_activa['moneda'] ?? '');
+    // Resolución del valor formateado de cada widget.
+    $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtNum, $fmtPct, $mon): string {
+        return match ($codigo) {
+            'gasto' => $mon . ' ' . $fmtMoneda($totales['gasto'] ?? 0),
+            'impresiones' => $fmtNum($totales['impresiones'] ?? 0),
+            'clicks' => $fmtNum($totales['clicks_totales'] ?? 0),
+            'ctr' => $fmtPct($totales['ctr'] ?? null),
+            'cpc' => isset($totales['cpc']) && $totales['cpc'] !== null ? $mon . ' ' . $fmtMoneda($totales['cpc']) : '—',
+            'cpm' => isset($totales['cpm']) && $totales['cpm'] !== null ? $mon . ' ' . $fmtMoneda($totales['cpm']) : '—',
+            'alcance' => $fmtNum($totales['alcance'] ?? 0),
+            default => '—',
+        };
+    };
+    ?>
     <div class="kpi-grid">
-        <div class="kpi">
-            <span class="kpi__label">Gasto</span>
-            <span class="kpi__value"><?= $view->e((string) ($cuenta_activa['moneda'] ?? '')) ?> <?= $fmtMoneda($totales['gasto'] ?? 0) ?></span>
-        </div>
-        <div class="kpi">
-            <span class="kpi__label">Impresiones</span>
-            <span class="kpi__value"><?= $fmtNum($totales['impresiones'] ?? 0) ?></span>
-        </div>
-        <div class="kpi">
-            <span class="kpi__label">Clicks</span>
-            <span class="kpi__value"><?= $fmtNum($totales['clicks_totales'] ?? 0) ?></span>
-        </div>
-        <div class="kpi">
-            <span class="kpi__label">CTR</span>
-            <span class="kpi__value"><?= $fmtPct($totales['ctr'] ?? null) ?></span>
-        </div>
-        <div class="kpi">
-            <span class="kpi__label">CPC promedio</span>
-            <span class="kpi__value"><?= isset($totales['cpc']) && $totales['cpc'] !== null ? $fmtMoneda($totales['cpc']) : '—' ?></span>
-        </div>
-        <div class="kpi">
-            <span class="kpi__label">CPM promedio</span>
-            <span class="kpi__value"><?= isset($totales['cpm']) && $totales['cpm'] !== null ? $fmtMoneda($totales['cpm']) : '—' ?></span>
-        </div>
+        <?php foreach ($widgets_visibles as $codigo): ?>
+            <div class="kpi">
+                <span class="kpi__label"><?= $view->e($widgets_disponibles[$codigo] ?? $codigo) ?></span>
+                <span class="kpi__value"><?= $view->e($valorWidget($codigo)) ?></span>
+            </div>
+        <?php endforeach; ?>
+        <?php if ($widgets_visibles === []): ?>
+            <p class="muted">No hay widgets configurados. Ajustá tus <a href="/cliente/preferencias">preferencias</a>.</p>
+        <?php endif; ?>
     </div>
 
     <article class="card" style="margin-top:1.5rem">
@@ -107,7 +108,7 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                 <tbody>
                 <?php foreach ($campanias as $c): ?>
                     <tr>
-                        <td><?= $view->e((string) $c['campania']) ?></td>
+                        <td><a href="/cliente/campanias/<?= (int) $c['campania_id'] ?>"><?= $view->e((string) $c['campania']) ?></a></td>
                         <td><?= $view->e((string) ($c['objetivo'] ?? '—')) ?></td>
                         <td><?= $view->e((string) ($c['estado'] ?? '—')) ?></td>
                         <td class="num"><?= $fmtMoneda($c['gasto']) ?></td>

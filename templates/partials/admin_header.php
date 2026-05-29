@@ -10,6 +10,7 @@
         <a href="/admin/meta" class="<?= $seccion === 'meta' ? 'active' : '' ?>">Cuenta Meta</a>
         <a href="/admin/importar" class="<?= $seccion === 'importar' ? 'active' : '' ?>">Importar</a>
         <a href="/admin/clientes" class="<?= $seccion === 'clientes' ? 'active' : '' ?>">Clientes</a>
+        <a href="/admin/plantillas" class="<?= $seccion === 'plantillas' ? 'active' : '' ?>">Plantillas</a>
     </nav>
     <div class="shell__user">
         <span><?= $view->e($usuario->nombreCompleto) ?></span>
