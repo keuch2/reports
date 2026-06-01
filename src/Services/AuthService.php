@@ -17,7 +17,7 @@ final class AuthService
     private const ARGON_OPTIONS = [
         'memory_cost' => 65536, // 64 MB
         'time_cost' => 4,
-        'threads' => 2,
+        'threads' => 1,
     ];
 
     public function __construct(

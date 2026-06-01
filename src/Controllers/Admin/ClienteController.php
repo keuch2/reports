@@ -75,7 +75,7 @@ final class ClienteController
         $repo = $this->container->get(ClienteRepository::class);
         $clienteId = $repo->crear($nombre, $correo !== '' ? $correo : null, $contacto !== '' ? $contacto : null, $telefono !== '' ? $telefono : null);
 
-        $hash = password_hash($usuarioPassword, PASSWORD_ARGON2ID, ['memory_cost' => 65536, 'time_cost' => 4, 'threads' => 2]);
+        $hash = password_hash($usuarioPassword, PASSWORD_ARGON2ID, ['memory_cost' => 65536, 'time_cost' => 4, 'threads' => 1]);
         $repo->crearUsuarioPrimario($clienteId, $usuarioCorreo, $hash, $usuarioNombre);
 
         $this->container->get(AuditService::class)->registrar(

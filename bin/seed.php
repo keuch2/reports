@@ -16,7 +16,7 @@ $db = new Database($dbConfig);
 $hashPassword = static fn (string $password): string => password_hash(
     $password,
     PASSWORD_ARGON2ID,
-    ['memory_cost' => 65536, 'time_cost' => 4, 'threads' => 2]
+    ['memory_cost' => 65536, 'time_cost' => 4, 'threads' => 1]
 );
 
 // 1. Seed catálogo de métricas (si no está poblado).

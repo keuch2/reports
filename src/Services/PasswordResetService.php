@@ -110,7 +110,7 @@ final class PasswordResetService
         }
 
         $hash = password_hash($passwordNuevo, PASSWORD_ARGON2ID, [
-            'memory_cost' => 65536, 'time_cost' => 4, 'threads' => 2,
+            'memory_cost' => 65536, 'time_cost' => 4, 'threads' => 1,
         ]);
 
         $this->db->beginTransaction();
