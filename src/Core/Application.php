@@ -13,6 +13,7 @@ use MisterCo\Reports\Repositories\ImportacionRepository;
 use MisterCo\Reports\Repositories\MetricaCatalogoRepository;
 use MisterCo\Reports\Repositories\MetricaSnapshotRepository;
 use MisterCo\Reports\Repositories\PlantillaPdfRepository;
+use MisterCo\Reports\Repositories\UsuarioRepository;
 use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\AuthService;
 use MisterCo\Reports\Services\DashboardPreferenciasService;
@@ -89,6 +90,7 @@ final class Application
         $container->bind(ImportacionRepository::class, fn (Container $c) => new ImportacionRepository($c->get(Database::class)));
         $container->bind(MetricaCatalogoRepository::class, fn (Container $c) => new MetricaCatalogoRepository($c->get(Database::class)));
         $container->bind(PlantillaPdfRepository::class, fn (Container $c) => new PlantillaPdfRepository($c->get(Database::class)));
+        $container->bind(UsuarioRepository::class, fn (Container $c) => new UsuarioRepository($c->get(Database::class)));
 
         // Servicios de dominio
         $container->bind(PermisosService::class, fn (Container $c) => new PermisosService($c->get(Database::class)));

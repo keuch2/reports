@@ -10,7 +10,9 @@ use MisterCo\Reports\Controllers\Admin\ImportacionHistoricoController;
 use MisterCo\Reports\Controllers\Admin\MetaConexionController;
 use MisterCo\Reports\Controllers\Admin\PermisosController;
 use MisterCo\Reports\Controllers\Admin\PlantillaPdfController;
+use MisterCo\Reports\Controllers\Admin\UsuarioAdminController;
 use MisterCo\Reports\Controllers\AuthController;
+use MisterCo\Reports\Controllers\PerfilController;
 use MisterCo\Reports\Controllers\Cliente\CampaniaController as ClienteCampaniaController;
 use MisterCo\Reports\Controllers\Cliente\DashboardController as ClienteDashboardController;
 use MisterCo\Reports\Controllers\Cliente\PreferenciasController as ClientePreferenciasController;
@@ -19,6 +21,7 @@ use MisterCo\Reports\Controllers\HomeController;
 use MisterCo\Reports\Controllers\PasswordResetController;
 use MisterCo\Reports\Core\Router;
 use MisterCo\Reports\Middleware\AdminMiddleware;
+use MisterCo\Reports\Middleware\AuthMiddleware;
 use MisterCo\Reports\Middleware\ClienteMiddleware;
 use MisterCo\Reports\Middleware\CsrfMiddleware;
 
@@ -38,6 +41,11 @@ return function (Router $router): void {
     // 2FA step (entre login y autenticado).
     $router->get('/2fa', [AuthController::class, 'mostrar2fa']);
     $router->post('/2fa', [AuthController::class, 'procesar2fa'], [CsrfMiddleware::class]);
+
+    // Mi perfil (cualquier rol logueado)
+    $router->get('/mi-perfil', [PerfilController::class, 'mostrar'], [AuthMiddleware::class]);
+    $router->post('/mi-perfil', [PerfilController::class, 'actualizarPerfil'], [AuthMiddleware::class, CsrfMiddleware::class]);
+    $router->post('/mi-perfil/password', [PerfilController::class, 'cambiarPassword'], [AuthMiddleware::class, CsrfMiddleware::class]);
 
     // --- Admin ---
     $admin = [AdminMiddleware::class];
@@ -82,6 +90,13 @@ return function (Router $router): void {
     $router->post('/admin/2fa/iniciar', [DosFactorController::class, 'iniciar'], $adminCsrf);
     $router->post('/admin/2fa/confirmar', [DosFactorController::class, 'confirmar'], $adminCsrf);
     $router->post('/admin/2fa/deshabilitar', [DosFactorController::class, 'deshabilitar'], $adminCsrf);
+
+    // CRUD de usuarios admin
+    $router->get('/admin/usuarios', [UsuarioAdminController::class, 'listar'], $admin);
+    $router->get('/admin/usuarios/nuevo', [UsuarioAdminController::class, 'mostrarNuevo'], $admin);
+    $router->post('/admin/usuarios', [UsuarioAdminController::class, 'crear'], $adminCsrf);
+    $router->post('/admin/usuarios/{id}/activar', [UsuarioAdminController::class, 'activar'], $adminCsrf);
+    $router->post('/admin/usuarios/{id}/desactivar', [UsuarioAdminController::class, 'desactivar'], $adminCsrf);
 
     // --- Cliente ---
     $cliente = [ClienteMiddleware::class];
