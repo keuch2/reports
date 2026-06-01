@@ -64,12 +64,10 @@ return function (Router $router): void {
     $router->get('/admin/clientes/nuevo', [AdminClienteController::class, 'mostrarNuevo'], $admin);
     $router->post('/admin/clientes', [AdminClienteController::class, 'crear'], $adminCsrf);
     $router->get('/admin/clientes/{id}', [AdminClienteController::class, 'detalle'], $admin);
-    $router->post('/admin/clientes/{id}/asignar', [AdminClienteController::class, 'asignarCuenta'], $adminCsrf);
-    $router->post('/admin/clientes/{id}/desasignar', [AdminClienteController::class, 'desasignarCuenta'], $adminCsrf);
+    $router->post('/admin/clientes/{id}/asignar', [AdminClienteController::class, 'asignarCampanias'], $adminCsrf);
 
-    // Permisos granulares por cliente
+    // Permisos avanzados por cliente (anuncios + métricas; campañas se asignan en /admin/clientes/{id})
     $router->get('/admin/clientes/{id}/permisos', [PermisosController::class, 'mostrar'], $admin);
-    $router->post('/admin/clientes/{id}/permisos/campanias', [PermisosController::class, 'guardarCampanias'], $adminCsrf);
     $router->post('/admin/clientes/{id}/permisos/anuncios', [PermisosController::class, 'guardarAnuncios'], $adminCsrf);
     $router->post('/admin/clientes/{id}/permisos/metricas', [PermisosController::class, 'guardarMetricas'], $adminCsrf);
 

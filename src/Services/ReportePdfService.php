@@ -19,17 +19,14 @@ final class ReportePdfService
     }
 
     /**
-     * Genera un PDF y retorna {ruta, nombre}.
+     * Genera un PDF agregado sobre TODAS las campañas asignadas al cliente.
      *
-     * @return array{ruta:string, nombre:string, tamanio:int}
-     */
-    /**
      * @param list<string> $secciones Secciones a incluir (de PlantillaPdfRepository::SECCIONES_DISPONIBLES).
-     *                                 Si vacío, se usa el set por defecto.
+     *                                 Si vacío, usa el set por defecto.
+     * @return array{ruta:string, nombre:string, tamanio:int}
      */
     public function generar(
         int $clienteId,
-        int $cuentaId,
         string $desde,
         string $hasta,
         int $generadoPorUsuarioId,
@@ -37,20 +34,31 @@ final class ReportePdfService
         ?string $comentarios = null,
         bool $marcaDeAgua = false,
     ): array {
-        $cuenta = $this->buscarCuenta($cuentaId);
         $cliente = $this->buscarCliente($clienteId);
 
         if ($secciones === []) {
             $secciones = ['resumen_ejecutivo', 'tabla_campanias', 'evolucion_diaria'];
         }
 
-        $totales = $this->dashboard->totalesPorCuenta($clienteId, $cuentaId, $desde, $hasta);
-        $campanias = $this->dashboard->porCampania($clienteId, $cuentaId, $desde, $hasta);
-        $evolucion = $this->dashboard->evolucionDiaria($clienteId, $cuentaId, $desde, $hasta);
+        $totales = $this->dashboard->totalesGlobales($clienteId, $desde, $hasta);
+        $campanias = $this->dashboard->porCampania($clienteId, $desde, $hasta);
+        $evolucion = $this->dashboard->evolucionDiaria($clienteId, $desde, $hasta);
+
+        // La moneda del PDF es la de la primera campaña asignada (asumimos consistencia).
+        $monedaInfo = $this->db->selectOne(
+            'SELECT cp.moneda
+               FROM permisos_cliente_campania pccam
+               JOIN campanias c ON c.id = pccam.campania_id
+               JOIN cuentas_publicitarias cp ON cp.id = c.cuenta_publicitaria_id
+              WHERE pccam.cliente_id = :c
+              LIMIT 1',
+            ['c' => $clienteId]
+        );
+        $moneda = (string) ($monedaInfo['moneda'] ?? '');
 
         $html = $this->view->render('pdf/reporte', [
             'cliente' => $cliente,
-            'cuenta' => $cuenta,
+            'cuenta' => ['nombre' => 'Campañas asignadas', 'moneda' => $moneda],
             'desde' => $desde,
             'hasta' => $hasta,
             'totales' => $totales,
@@ -117,17 +125,6 @@ final class ReportePdfService
         $row = $this->db->selectOne('SELECT id, nombre_comercial, correo_contacto FROM clientes WHERE id = :id', ['id' => $id]);
         if ($row === null) {
             throw new \RuntimeException("Cliente {$id} no encontrado.");
-        }
-
-        return $row;
-    }
-
-    /** @return array<string,mixed> */
-    private function buscarCuenta(int $id): array
-    {
-        $row = $this->db->selectOne('SELECT id, nombre, meta_account_id, moneda FROM cuentas_publicitarias WHERE id = :id', ['id' => $id]);
-        if ($row === null) {
-            throw new \RuntimeException("Cuenta {$id} no encontrada.");
         }
 
         return $row;

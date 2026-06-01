@@ -2,84 +2,34 @@
 /** @var \MisterCo\Reports\Core\View $view */
 /** @var \MisterCo\Reports\Domain\Usuario $usuario */
 /** @var array<string,mixed> $cliente */
-/** @var list<array<string,mixed>> $cuentas */
-/** @var int $cuenta_id */
-/** @var list<array<string,mixed>> $campanias */
+/** @var list<array<string,mixed>> $campanias_asignadas */
 /** @var array<int,list<array<string,mixed>>> $anuncios_por_campania */
-/** @var list<int> $campanias_ocultas */
 /** @var array<int,list<int>> $anuncios_ocultos */
 /** @var array<string,list<array<string,mixed>>> $catalogo */
 /** @var list<string> $metricas_deshabilitadas */
 /** @var string|null $success */
 /** @var string|null $error */
-
-$camsOcultasSet = array_flip($campanias_ocultas);
 ?>
 <?= $view->renderPartial('partials/admin_header', ['usuario' => $usuario, 'seccion' => 'clientes']) ?>
 
 <section class="shell__body">
     <p><a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id'])) ?>">← Volver al cliente</a></p>
-    <h1>Permisos · <?= $view->e((string) $cliente['nombre_comercial']) ?></h1>
+    <h1>Permisos avanzados · <?= $view->e((string) $cliente['nombre_comercial']) ?></h1>
+    <p class="muted">La asignación de campañas se hace en la <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id'])) ?>">página del cliente</a>. Acá refinás: ocultar anuncios puntuales y deshabilitar métricas.</p>
 
     <?php if ($error): ?><div class="alert alert--error"><?= $view->e((string) $error) ?></div><?php endif; ?>
     <?php if ($success): ?><div class="alert alert--success"><?= $view->e((string) $success) ?></div><?php endif; ?>
 
-    <?php if ($cuentas === []): ?>
+    <?php if ($campanias_asignadas === []): ?>
         <div class="alert alert--warning">
-            Este cliente no tiene cuentas asignadas. <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id'])) ?>">Asigná una primero</a>.
+            Este cliente no tiene campañas asignadas todavía.
+            <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id'])) ?>">Asigná campañas primero</a>.
         </div>
     <?php else: ?>
+        <h2 style="margin-top:1.5rem">Anuncios ocultos por campaña</h2>
+        <p class="muted">Marcá los anuncios que NO querés que el cliente vea dentro de cada campaña asignada (ej. creativos en testing).</p>
 
-    <article class="card">
-        <form method="GET" class="form-stack" style="max-width:520px">
-            <label class="field">
-                <span class="field__label">Cuenta publicitaria</span>
-                <select class="field__input" name="cuenta_id" onchange="this.form.submit()">
-                    <?php foreach ($cuentas as $c): ?>
-                        <option value="<?= (int) $c['id'] ?>" <?= (int) $c['id'] === $cuenta_id ? 'selected' : '' ?>>
-                            <?= $view->e((string) $c['nombre']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <p class="muted">Default: <strong>todo visible</strong>. Marcá solo lo que querés <em>ocultar</em>.</p>
-        </form>
-    </article>
-
-    <?php if ($campanias === []): ?>
-        <article class="card" style="margin-top:1.5rem">
-            <p class="muted">No hay campañas importadas para esta cuenta todavía.
-                <a href="<?= $view->url('/admin/importar') ?>">Importá primero</a>.</p>
-        </article>
-    <?php else: ?>
-        <article class="card" style="margin-top:1.5rem">
-            <h2>Campañas (<?= count($campanias) ?>)</h2>
-            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/permisos/campanias') ?>">
-                <?= $view->csrfField() ?>
-                <input type="hidden" name="cuenta_id" value="<?= $cuenta_id ?>">
-                <table class="table">
-                    <thead><tr><th style="width:60px">Ocultar</th><th>Campaña</th><th>Objetivo</th><th>Estado</th></tr></thead>
-                    <tbody>
-                    <?php foreach ($campanias as $c): ?>
-                        <tr>
-                            <td>
-                                <input type="checkbox" name="ocultas[]" value="<?= (int) $c['id'] ?>"
-                                       <?= isset($camsOcultasSet[(int) $c['id']]) ? 'checked' : '' ?>>
-                            </td>
-                            <td><?= $view->e((string) $c['nombre']) ?></td>
-                            <td><?= $view->e((string) ($c['objetivo'] ?? '—')) ?></td>
-                            <td><?= $view->e((string) ($c['estado'] ?? '—')) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-                <div class="form-actions" style="margin-top:1rem">
-                    <button type="submit" class="btn btn--primary">Guardar campañas ocultas</button>
-                </div>
-            </form>
-        </article>
-
-        <?php foreach ($campanias as $cam): ?>
+        <?php foreach ($campanias_asignadas as $cam): ?>
             <?php
             $cid = (int) $cam['id'];
             $anuncios = $anuncios_por_campania[$cid] ?? [];
@@ -89,14 +39,16 @@ $camsOcultasSet = array_flip($campanias_ocultas);
             <article class="card" style="margin-top:1rem">
                 <details <?= !empty($anuncios_ocultos[$cid]) ? 'open' : '' ?>>
                     <summary style="font-size:0.95rem;font-weight:600">
-                        Anuncios de "<?= $view->e((string) $cam['nombre']) ?>" (<?= count($anuncios) ?>)
+                        <?= $view->e((string) $cam['cuenta_nombre']) ?>
+                        <span class="muted">›</span>
+                        <?= $view->e((string) $cam['campania']) ?>
+                        <span class="muted">(<?= count($anuncios) ?> anuncios)</span>
                         <?php if (!empty($anuncios_ocultos[$cid])): ?>
                             <span class="badge badge--fallida"><?= count($anuncios_ocultos[$cid]) ?> ocultos</span>
                         <?php endif; ?>
                     </summary>
                     <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/permisos/anuncios') ?>" style="margin-top:1rem">
                         <?= $view->csrfField() ?>
-                        <input type="hidden" name="cuenta_id" value="<?= $cuenta_id ?>">
                         <input type="hidden" name="campania_id" value="<?= $cid ?>">
                         <table class="table">
                             <thead><tr><th style="width:60px">Ocultar</th><th>Anuncio</th><th>Adset</th><th>Tipo</th><th>Estado</th></tr></thead>
@@ -116,7 +68,7 @@ $camsOcultasSet = array_flip($campanias_ocultas);
                             </tbody>
                         </table>
                         <div class="form-actions" style="margin-top:0.75rem">
-                            <button type="submit" class="btn btn--primary">Guardar anuncios ocultos de esta campaña</button>
+                            <button type="submit" class="btn btn--primary">Guardar anuncios ocultos</button>
                         </div>
                     </form>
                 </details>
@@ -124,14 +76,11 @@ $camsOcultasSet = array_flip($campanias_ocultas);
         <?php endforeach; ?>
     <?php endif; ?>
 
-    <?php endif; // cuentas existen ?>
-
     <article class="card" style="margin-top:1.5rem">
         <h2>Métricas habilitadas para este cliente</h2>
         <p class="muted">Marcá las que querés <strong>deshabilitar</strong>. Aplican a dashboard y PDFs.</p>
         <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/permisos/metricas') ?>">
             <?= $view->csrfField() ?>
-            <input type="hidden" name="cuenta_id" value="<?= $cuenta_id ?>">
 
             <?php foreach ($catalogo as $categoria => $metricas): ?>
                 <fieldset class="fieldset" style="margin-top:1rem">

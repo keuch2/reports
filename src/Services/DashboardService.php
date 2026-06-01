@@ -9,8 +9,12 @@ use RuntimeException;
 
 /**
  * Consultas de métricas con validación de permisos del cliente.
- * Cada método valida que la cuenta solicitada pertenezca al cliente y
- * descarta campañas/anuncios marcados como ocultos por el admin.
+ *
+ * NUEVO MODELO (desde migración 0010):
+ * - El cliente NO está asignado a cuentas; está asignado a CAMPAÑAS individuales.
+ * - permisos_cliente_campania.cliente_id + campania_id = campaña asignada y visible.
+ * - permisos_cliente_anuncio.visible = 0 sigue valiendo para ocultar anuncios
+ *   específicos dentro de una campaña asignada (caso uso: ocultar creativos en testing).
  */
 final class DashboardService
 {
@@ -20,39 +24,51 @@ final class DashboardService
     ) {
     }
 
-    /** @return list<array<string,mixed>> Cuentas a las que el cliente tiene acceso */
-    public function cuentasDelCliente(int $clienteId): array
+    /**
+     * Campañas asignadas al cliente. Cada fila incluye datos de la cuenta a la que
+     * pertenece (sirve para mostrar contexto: "Black Friday — Cuenta Foo").
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function campaniasDelCliente(int $clienteId): array
     {
         return $this->db->select(
-            'SELECT cp.id, cp.meta_account_id, cp.nombre, cp.moneda, cp.ultima_sincronizacion_en
-               FROM permisos_cliente_cuenta pcc
-               JOIN cuentas_publicitarias cp ON cp.id = pcc.cuenta_publicitaria_id
-              WHERE pcc.cliente_id = :cid
-           ORDER BY cp.nombre',
+            'SELECT c.id, c.meta_campaign_id, c.nombre AS campania, c.objetivo, c.estado,
+                    c.fecha_inicio, c.fecha_fin,
+                    cp.id AS cuenta_id, cp.nombre AS cuenta_nombre, cp.moneda
+               FROM permisos_cliente_campania pccam
+               JOIN campanias c ON c.id = pccam.campania_id
+               JOIN cuentas_publicitarias cp ON cp.id = c.cuenta_publicitaria_id
+              WHERE pccam.cliente_id = :cid
+           ORDER BY cp.nombre, c.nombre',
             ['cid' => $clienteId]
         );
     }
 
-    public function clienteTieneAccesoACuenta(int $clienteId, int $cuentaId): bool
+    public function clienteTieneAccesoACampania(int $clienteId, int $campaniaId): bool
     {
         $row = $this->db->selectOne(
-            'SELECT 1 FROM permisos_cliente_cuenta
-              WHERE cliente_id = :c AND cuenta_publicitaria_id = :a LIMIT 1',
-            ['c' => $clienteId, 'a' => $cuentaId]
+            'SELECT 1 FROM permisos_cliente_campania
+              WHERE cliente_id = :c AND campania_id = :ca LIMIT 1',
+            ['c' => $clienteId, 'ca' => $campaniaId]
         );
 
         return $row !== null;
     }
 
     /**
-     * Totales agregados de la cuenta en el rango, descontando entidades ocultas.
+     * Totales agregados sobre todas las campañas asignadas (descontando anuncios ocultos).
      *
      * @return array<string, float|int|null>
      */
-    public function totalesPorCuenta(int $clienteId, int $cuentaId, string $desde, string $hasta): array
+    public function totalesGlobales(int $clienteId, string $desde, string $hasta): array
     {
-        $this->asegurarAcceso($clienteId, $cuentaId);
-        [$exclCampaniasSql, $exclAnunciosSql, $params] = $this->fragmentosExclusion($clienteId, $cuentaId);
+        $idsCampanias = $this->idsCampaniasAsignadas($clienteId);
+        if ($idsCampanias === []) {
+            return $this->cerosTotal();
+        }
+        [$camsPlaceholders, $camsParams] = $this->placeholders($idsCampanias, 'cam');
+        [$exclAnunciosSql, $anunciosParams] = $this->fragmentoAnunciosOcultosGlobal($clienteId);
 
         $row = $this->db->selectOne(
             "SELECT
@@ -73,25 +89,33 @@ final class DashboardService
               FROM metricas_snapshots ms
               JOIN anuncios a ON a.id = ms.entidad_id AND ms.nivel = 'ad'
               JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
-              JOIN campanias c ON c.id = cs.campania_id
-             WHERE c.cuenta_publicitaria_id = :cuenta
+             WHERE cs.campania_id IN ({$camsPlaceholders})
                AND ms.fecha BETWEEN :desde AND :hasta
-               {$exclCampaniasSql}
                {$exclAnunciosSql}",
-            array_merge(['cuenta' => $cuentaId, 'desde' => $desde, 'hasta' => $hasta], $params)
+            array_merge(['desde' => $desde, 'hasta' => $hasta], $camsParams, $anunciosParams)
         );
 
-        return $row ?? [];
+        return $row ?? $this->cerosTotal();
     }
 
-    /** @return list<array<string,mixed>> Una fila por campaña visible con totales del rango */
-    public function porCampania(int $clienteId, int $cuentaId, string $desde, string $hasta): array
+    /**
+     * Una fila por campaña asignada con sus totales del rango.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function porCampania(int $clienteId, string $desde, string $hasta): array
     {
-        $this->asegurarAcceso($clienteId, $cuentaId);
-        [$exclCampaniasSql, $exclAnunciosSql, $params] = $this->fragmentosExclusion($clienteId, $cuentaId);
+        $idsCampanias = $this->idsCampaniasAsignadas($clienteId);
+        if ($idsCampanias === []) {
+            return [];
+        }
+        [$camsPlaceholders, $camsParams] = $this->placeholders($idsCampanias, 'cam');
+        [$exclAnunciosSql, $anunciosParams] = $this->fragmentoAnunciosOcultosGlobal($clienteId);
 
-        $sql = "SELECT
+        return $this->db->select(
+            "SELECT
                 c.id AS campania_id, c.nombre AS campania, c.objetivo, c.estado,
+                cp.nombre AS cuenta_nombre, cp.moneda,
                 COALESCE(SUM(ms.gasto), 0) AS gasto,
                 COALESCE(SUM(ms.impresiones), 0) AS impresiones,
                 COALESCE(SUM(ms.clicks_totales), 0) AS clicks,
@@ -102,26 +126,31 @@ final class DashboardService
                      THEN SUM(ms.gasto) / SUM(ms.clicks_totales)
                      ELSE NULL END AS cpc
               FROM campanias c
+              JOIN cuentas_publicitarias cp ON cp.id = c.cuenta_publicitaria_id
          LEFT JOIN conjuntos_anuncios cs ON cs.campania_id = c.id
          LEFT JOIN anuncios a ON a.conjunto_anuncios_id = cs.id {$exclAnunciosSql}
          LEFT JOIN metricas_snapshots ms ON ms.entidad_id = a.id AND ms.nivel = 'ad'
                                          AND ms.fecha BETWEEN :desde AND :hasta
-             WHERE c.cuenta_publicitaria_id = :cuenta
-               {$exclCampaniasSql}
-          GROUP BY c.id, c.nombre, c.objetivo, c.estado
-          ORDER BY gasto DESC";
-
-        return $this->db->select(
-            $sql,
-            array_merge(['cuenta' => $cuentaId, 'desde' => $desde, 'hasta' => $hasta], $params)
+             WHERE c.id IN ({$camsPlaceholders})
+          GROUP BY c.id, c.nombre, c.objetivo, c.estado, cp.nombre, cp.moneda
+          ORDER BY gasto DESC",
+            array_merge(['desde' => $desde, 'hasta' => $hasta], $camsParams, $anunciosParams)
         );
     }
 
-    /** @return list<array<string,mixed>> Serie temporal por día */
-    public function evolucionDiaria(int $clienteId, int $cuentaId, string $desde, string $hasta): array
+    /**
+     * Serie temporal diaria agregada sobre las campañas asignadas.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function evolucionDiaria(int $clienteId, string $desde, string $hasta): array
     {
-        $this->asegurarAcceso($clienteId, $cuentaId);
-        [$exclCampaniasSql, $exclAnunciosSql, $params] = $this->fragmentosExclusion($clienteId, $cuentaId);
+        $idsCampanias = $this->idsCampaniasAsignadas($clienteId);
+        if ($idsCampanias === []) {
+            return [];
+        }
+        [$camsPlaceholders, $camsParams] = $this->placeholders($idsCampanias, 'cam');
+        [$exclAnunciosSql, $anunciosParams] = $this->fragmentoAnunciosOcultosGlobal($clienteId);
 
         return $this->db->select(
             "SELECT
@@ -132,35 +161,30 @@ final class DashboardService
               FROM metricas_snapshots ms
               JOIN anuncios a ON a.id = ms.entidad_id AND ms.nivel = 'ad'
               JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
-              JOIN campanias c ON c.id = cs.campania_id
-             WHERE c.cuenta_publicitaria_id = :cuenta
+             WHERE cs.campania_id IN ({$camsPlaceholders})
                AND ms.fecha BETWEEN :desde AND :hasta
-               {$exclCampaniasSql}
                {$exclAnunciosSql}
           GROUP BY ms.fecha
           ORDER BY ms.fecha",
-            array_merge(['cuenta' => $cuentaId, 'desde' => $desde, 'hasta' => $hasta], $params)
+            array_merge(['desde' => $desde, 'hasta' => $hasta], $camsParams, $anunciosParams)
         );
     }
 
     /**
-     * Totales agregados de una campaña específica para un cliente.
+     * Totales de una campaña específica (sirve para detalle).
      *
      * @return array<string, mixed>
      */
     public function totalesCampania(int $clienteId, int $campaniaId, string $desde, string $hasta): array
     {
+        $this->asegurarAccesoCampania($clienteId, $campaniaId);
         $params = ['cam' => $campaniaId, 'desde' => $desde, 'hasta' => $hasta];
         $exclAnunciosSql = '';
         $ocultos = $this->permisos->anunciosOcultosDeCampania($clienteId, $campaniaId);
         if ($ocultos !== []) {
-            $placeholders = [];
-            foreach ($ocultos as $i => $id) {
-                $key = "exc_a_{$i}";
-                $placeholders[] = ":{$key}";
-                $params[$key] = $id;
-            }
-            $exclAnunciosSql = 'AND a.id NOT IN (' . implode(',', $placeholders) . ')';
+            [$ph, $exclParams] = $this->placeholders($ocultos, 'exc_a');
+            $exclAnunciosSql = "AND a.id NOT IN ({$ph})";
+            $params = array_merge($params, $exclParams);
         }
 
         $row = $this->db->selectOne(
@@ -184,23 +208,20 @@ final class DashboardService
             $params
         );
 
-        return $row ?? [];
+        return $row ?? $this->cerosCampania();
     }
 
-    /** @return list<array<string,mixed>> Anuncios visibles de una campaña con sus métricas agregadas */
+    /** @return list<array<string,mixed>> Anuncios visibles de una campaña con métricas agregadas */
     public function anunciosDeCampaniaConMetricas(int $clienteId, int $campaniaId, string $desde, string $hasta): array
     {
+        $this->asegurarAccesoCampania($clienteId, $campaniaId);
         $params = ['cam' => $campaniaId, 'desde' => $desde, 'hasta' => $hasta];
         $exclAnunciosSql = '';
         $ocultos = $this->permisos->anunciosOcultosDeCampania($clienteId, $campaniaId);
         if ($ocultos !== []) {
-            $placeholders = [];
-            foreach ($ocultos as $i => $id) {
-                $key = "exc_a_{$i}";
-                $placeholders[] = ":{$key}";
-                $params[$key] = $id;
-            }
-            $exclAnunciosSql = 'AND a.id NOT IN (' . implode(',', $placeholders) . ')';
+            [$ph, $exclParams] = $this->placeholders($ocultos, 'exc_a');
+            $exclAnunciosSql = "AND a.id NOT IN ({$ph})";
+            $params = array_merge($params, $exclParams);
         }
 
         return $this->db->select(
@@ -225,56 +246,82 @@ final class DashboardService
         );
     }
 
-    private function asegurarAcceso(int $clienteId, int $cuentaId): void
+    // ─── Helpers ───
+
+    /** @return list<int> */
+    private function idsCampaniasAsignadas(int $clienteId): array
     {
-        if (!$this->clienteTieneAccesoACuenta($clienteId, $cuentaId)) {
-            throw new RuntimeException('Sin permisos para esa cuenta.');
-        }
+        $rows = $this->db->select(
+            'SELECT campania_id FROM permisos_cliente_campania WHERE cliente_id = :c',
+            ['c' => $clienteId]
+        );
+
+        return array_map(static fn ($r) => (int) $r['campania_id'], $rows);
     }
 
     /**
-     * Devuelve fragmentos SQL y params para excluir campañas/anuncios ocultos.
+     * Devuelve fragmento SQL "AND a.id NOT IN (:p1,:p2,...)" para excluir anuncios
+     * ocultos para el cliente entre todas sus campañas asignadas.
      *
-     * @return array{0:string, 1:string, 2:array<string, int>}
+     * @return array{0:string, 1:array<string,int>}
      */
-    private function fragmentosExclusion(int $clienteId, int $cuentaId): array
+    private function fragmentoAnunciosOcultosGlobal(int $clienteId): array
     {
-        $params = [];
-        $exclCampaniasSql = '';
-        $exclAnunciosSql = '';
-
-        $camsOcultas = $this->permisos->campaniasOcultas($clienteId, $cuentaId);
-        if ($camsOcultas !== []) {
-            $placeholders = [];
-            foreach ($camsOcultas as $i => $id) {
-                $key = "exc_c_{$i}";
-                $placeholders[] = ":{$key}";
-                $params[$key] = $id;
-            }
-            $exclCampaniasSql = 'AND c.id NOT IN (' . implode(',', $placeholders) . ')';
-        }
-
-        // Anuncios ocultos a nivel cliente: traemos los IDs explícitos.
-        $anunciosOcultos = $this->db->select(
-            'SELECT a.id
-               FROM permisos_cliente_anuncio p
-               JOIN anuncios a ON a.id = p.anuncio_id
-               JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
-               JOIN campanias c ON c.id = cs.campania_id
-              WHERE p.cliente_id = :cli AND p.visible = 0
-                AND c.cuenta_publicitaria_id = :cuenta',
-            ['cli' => $clienteId, 'cuenta' => $cuentaId]
+        $rows = $this->db->select(
+            'SELECT pa.anuncio_id
+               FROM permisos_cliente_anuncio pa
+              WHERE pa.cliente_id = :c AND pa.visible = 0',
+            ['c' => $clienteId]
         );
-        if ($anunciosOcultos !== []) {
-            $placeholders = [];
-            foreach ($anunciosOcultos as $i => $r) {
-                $key = "exc_a_{$i}";
-                $placeholders[] = ":{$key}";
-                $params[$key] = (int) $r['id'];
-            }
-            $exclAnunciosSql = 'AND a.id NOT IN (' . implode(',', $placeholders) . ')';
+        if ($rows === []) {
+            return ['', []];
+        }
+        $ids = array_map(static fn ($r) => (int) $r['anuncio_id'], $rows);
+        [$ph, $params] = $this->placeholders($ids, 'exc_a');
+
+        return ["AND a.id NOT IN ({$ph})", $params];
+    }
+
+    /**
+     * @param list<int> $ids
+     * @return array{0:string, 1:array<string,int>}
+     */
+    private function placeholders(array $ids, string $prefijo): array
+    {
+        $placeholders = [];
+        $params = [];
+        foreach ($ids as $i => $id) {
+            $key = "{$prefijo}_{$i}";
+            $placeholders[] = ":{$key}";
+            $params[$key] = (int) $id;
         }
 
-        return [$exclCampaniasSql, $exclAnunciosSql, $params];
+        return [implode(',', $placeholders), $params];
+    }
+
+    private function asegurarAccesoCampania(int $clienteId, int $campaniaId): void
+    {
+        if (!$this->clienteTieneAccesoACampania($clienteId, $campaniaId)) {
+            throw new RuntimeException('Sin permisos para esa campaña.');
+        }
+    }
+
+    /** @return array<string, int|float|null> */
+    private function cerosTotal(): array
+    {
+        return [
+            'gasto' => 0, 'impresiones' => 0, 'alcance' => 0,
+            'clicks_totales' => 0, 'clicks_enlace' => 0,
+            'ctr' => null, 'cpc' => null, 'cpm' => null,
+        ];
+    }
+
+    /** @return array<string, int|float|null> */
+    private function cerosCampania(): array
+    {
+        return [
+            'gasto' => 0, 'impresiones' => 0, 'alcance' => 0,
+            'clicks' => 0, 'ctr' => null, 'cpc' => null,
+        ];
     }
 }

@@ -1,38 +1,46 @@
 <?php
 /** @var \MisterCo\Reports\Core\View $view */
 /** @var \MisterCo\Reports\Domain\Usuario $usuario */
-/** @var list<array<string,mixed>> $cuentas */
-/** @var array<string,mixed> $cuenta_activa */
+/** @var int $campanias_asignadas_count */
+/** @var string $moneda */
 /** @var string $desde */
 /** @var string $hasta */
 /** @var string $preset */
 /** @var array<string,mixed> $totales */
 /** @var list<array<string,mixed>> $campanias */
 /** @var list<array<string,mixed>> $evolucion */
+/** @var list<string> $widgets_visibles */
+/** @var array<string,string> $widgets_disponibles */
 
 $fmtMoneda = static fn ($v) => number_format((float) $v, 2, ',', '.');
 $fmtNum = static fn ($v) => number_format((float) $v, 0, ',', '.');
 $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, ',', '.') . '%';
+
+$mon = $moneda;
+$valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtNum, $fmtPct, $mon): string {
+    return match ($codigo) {
+        'gasto' => $mon . ' ' . $fmtMoneda($totales['gasto'] ?? 0),
+        'impresiones' => $fmtNum($totales['impresiones'] ?? 0),
+        'clicks' => $fmtNum($totales['clicks_totales'] ?? 0),
+        'ctr' => $fmtPct($totales['ctr'] ?? null),
+        'cpc' => isset($totales['cpc']) && $totales['cpc'] !== null ? $mon . ' ' . $fmtMoneda($totales['cpc']) : '—',
+        'cpm' => isset($totales['cpm']) && $totales['cpm'] !== null ? $mon . ' ' . $fmtMoneda($totales['cpm']) : '—',
+        'alcance' => $fmtNum($totales['alcance'] ?? 0),
+        default => '—',
+    };
+};
 ?>
 <?= $view->renderPartial('partials/cliente_header', ['usuario' => $usuario]) ?>
 
 <section class="shell__body">
-    <form method="GET" action="<?= $view->url('/cliente') ?>" class="dashboard-filters">
-        <?php if (count($cuentas) > 1): ?>
-            <label class="field">
-                <span class="field__label">Cuenta</span>
-                <select class="field__input" name="cuenta_id" onchange="this.form.submit()">
-                    <?php foreach ($cuentas as $c): ?>
-                        <option value="<?= (int) $c['id'] ?>" <?= (int) $c['id'] === (int) $cuenta_activa['id'] ? 'selected' : '' ?>>
-                            <?= $view->e((string) $c['nombre']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-        <?php else: ?>
-            <input type="hidden" name="cuenta_id" value="<?= (int) $cuenta_activa['id'] ?>">
-        <?php endif; ?>
+    <div class="header-row">
+        <div>
+            <h1>Mi dashboard</h1>
+            <p class="muted"><?= $campanias_asignadas_count ?> campaña<?= $campanias_asignadas_count === 1 ? '' : 's' ?> asignada<?= $campanias_asignadas_count === 1 ? '' : 's' ?></p>
+        </div>
+    </div>
 
+    <form method="GET" action="<?= $view->url('/cliente') ?>" class="dashboard-filters">
         <label class="field">
             <span class="field__label">Rango</span>
             <select class="field__input" name="preset" onchange="this.form.submit()">
@@ -45,26 +53,10 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
             </select>
         </label>
 
-        <a href="<?= $view->url('/cliente/reporte/previa?cuenta_id=' . ((int) $cuenta_activa['id']) . '&preset=' . ($view->e($preset))) ?>"
+        <a href="<?= $view->url('/cliente/reporte/previa?preset=' . ($view->e($preset))) ?>"
            class="btn btn--primary">📄 Exportar PDF</a>
     </form>
 
-<?php
-    $mon = (string) ($cuenta_activa['moneda'] ?? '');
-    // Resolución del valor formateado de cada widget.
-    $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtNum, $fmtPct, $mon): string {
-        return match ($codigo) {
-            'gasto' => $mon . ' ' . $fmtMoneda($totales['gasto'] ?? 0),
-            'impresiones' => $fmtNum($totales['impresiones'] ?? 0),
-            'clicks' => $fmtNum($totales['clicks_totales'] ?? 0),
-            'ctr' => $fmtPct($totales['ctr'] ?? null),
-            'cpc' => isset($totales['cpc']) && $totales['cpc'] !== null ? $mon . ' ' . $fmtMoneda($totales['cpc']) : '—',
-            'cpm' => isset($totales['cpm']) && $totales['cpm'] !== null ? $mon . ' ' . $fmtMoneda($totales['cpm']) : '—',
-            'alcance' => $fmtNum($totales['alcance'] ?? 0),
-            default => '—',
-        };
-    };
-    ?>
     <div class="kpi-grid">
         <?php foreach ($widgets_visibles as $codigo): ?>
             <div class="kpi">
@@ -77,15 +69,17 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
         <?php endif; ?>
     </div>
 
-    <article class="card" style="margin-top:1.5rem">
-        <h2>Evolución diaria</h2>
-        <canvas id="grafico-evolucion" height="120"></canvas>
-    </article>
+    <?php if ($campanias !== []): ?>
+        <article class="card" style="margin-top:1.5rem">
+            <h2>Evolución diaria</h2>
+            <canvas id="grafico-evolucion" height="120"></canvas>
+        </article>
 
-    <article class="card" style="margin-top:1.5rem">
-        <h2>Distribución de inversión por campaña</h2>
-        <canvas id="grafico-distribucion" height="100"></canvas>
-    </article>
+        <article class="card" style="margin-top:1.5rem">
+            <h2>Distribución de inversión por campaña</h2>
+            <canvas id="grafico-distribucion" height="100"></canvas>
+        </article>
+    <?php endif; ?>
 
     <article class="card" style="margin-top:1.5rem">
         <h2>Campañas (<?= count($campanias) ?>)</h2>
@@ -96,7 +90,7 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                 <thead>
                     <tr>
                         <th>Campaña</th>
-                        <th>Objetivo</th>
+                        <th>Cuenta</th>
                         <th>Estado</th>
                         <th class="num">Gasto</th>
                         <th class="num">Impresiones</th>
@@ -109,9 +103,9 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                 <?php foreach ($campanias as $c): ?>
                     <tr>
                         <td><a href="<?= $view->url('/cliente/campanias/' . ((int) $c['campania_id'])) ?>"><?= $view->e((string) $c['campania']) ?></a></td>
-                        <td><?= $view->e((string) ($c['objetivo'] ?? '—')) ?></td>
+                        <td><small class="muted"><?= $view->e((string) ($c['cuenta_nombre'] ?? '')) ?></small></td>
                         <td><?= $view->e((string) ($c['estado'] ?? '—')) ?></td>
-                        <td class="num"><?= $fmtMoneda($c['gasto']) ?></td>
+                        <td class="num"><?= $view->e((string) ($c['moneda'] ?? '')) ?> <?= $fmtMoneda($c['gasto']) ?></td>
                         <td class="num"><?= $fmtNum($c['impresiones']) ?></td>
                         <td class="num"><?= $fmtNum($c['clicks']) ?></td>
                         <td class="num"><?= $fmtPct($c['ctr']) ?></td>
@@ -124,6 +118,7 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
     </article>
 </section>
 
+<?php if ($campanias !== []): ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
     const evolucion = <?= json_encode($evolucion, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK) ?>;
@@ -135,7 +130,7 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
             data: {
                 labels: evolucion.map(e => e.fecha),
                 datasets: [
-                    { label: 'Gasto', data: evolucion.map(e => e.gasto), borderColor: '#1f3a8a', tension: 0.3, yAxisID: 'y1' },
+                    { label: 'Gasto', data: evolucion.map(e => e.gasto), borderColor: '#1a2f6e', tension: 0.3, yAxisID: 'y1' },
                     { label: 'Impresiones', data: evolucion.map(e => e.impresiones), borderColor: '#10b981', tension: 0.3, yAxisID: 'y2' }
                 ]
             },
@@ -157,10 +152,11 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                 labels: campanias.map(c => c.campania),
                 datasets: [{
                     data: campanias.map(c => c.gasto),
-                    backgroundColor: ['#1f3a8a', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#ec4899']
+                    backgroundColor: ['#1a2f6e', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#ec4899']
                 }]
             },
             options: { responsive: true, plugins: { legend: { position: 'right' } } }
         });
     }
 </script>
+<?php endif; ?>

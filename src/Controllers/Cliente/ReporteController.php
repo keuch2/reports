@@ -26,11 +26,10 @@ final class ReporteController
         /** @var Usuario $usuario */
         $usuario = $request->attributes['usuario'];
         $clienteId = (int) $usuario->clienteId;
-        $cuentaId = (int) $request->input('cuenta_id', 0);
 
         $dashboard = $this->container->get(DashboardService::class);
-        if (!$dashboard->clienteTieneAccesoACuenta($clienteId, $cuentaId)) {
-            return Response::html('<h1>403 — Sin acceso a esa cuenta.</h1>', 403);
+        if ($dashboard->campaniasDelCliente($clienteId) === []) {
+            return Response::html('<h1>403 — No tenés campañas asignadas.</h1>', 403);
         }
 
         $preset = (string) $request->input('preset', 'ultimos_30_dias');
@@ -39,7 +38,6 @@ final class ReporteController
         return Response::html($view->render('cliente/reporte_previa', [
             'usuario' => $usuario,
             'titulo' => 'Generar reporte',
-            'cuenta_id' => $cuentaId,
             'preset' => $preset,
         ]));
     }
@@ -49,11 +47,10 @@ final class ReporteController
         /** @var Usuario $usuario */
         $usuario = $request->attributes['usuario'];
         $clienteId = (int) $usuario->clienteId;
-        $cuentaId = (int) $request->input('cuenta_id', 0);
 
         $dashboard = $this->container->get(DashboardService::class);
-        if (!$dashboard->clienteTieneAccesoACuenta($clienteId, $cuentaId)) {
-            return Response::html('<h1>403 — Sin acceso a esa cuenta.</h1>', 403);
+        if ($dashboard->campaniasDelCliente($clienteId) === []) {
+            return Response::html('<h1>403 — No tenés campañas asignadas.</h1>', 403);
         }
 
         [$desde, $hasta] = $this->resolverRango(
@@ -65,19 +62,18 @@ final class ReporteController
         $comentarios = trim((string) $request->input('comentarios', ''));
         $marcaDeAgua = filter_var($request->input('marca_de_agua', false), FILTER_VALIDATE_BOOLEAN);
 
-        // Resolver plantilla aplicable al cliente (específica o genérica).
         $plantillaRepo = $this->container->get(PlantillaPdfRepository::class);
         $plantilla = $plantillaRepo->paraCliente($clienteId);
         $secciones = $plantilla !== null ? PlantillaPdfRepository::seccionesDe($plantilla) : [];
 
         $pdf = $this->container->get(ReportePdfService::class)
-            ->generar($clienteId, $cuentaId, $desde, $hasta, $usuario->id, $secciones,
+            ->generar($clienteId, $desde, $hasta, $usuario->id, $secciones,
                 $comentarios !== '' ? $comentarios : null, $marcaDeAgua);
 
         $this->container->get(AuditService::class)->registrar(
             'pdf.generado', $usuario, $request->ip, $request->userAgent,
             'reporte_pdf', (string) ($pdf['nombre'] ?? ''),
-            ['cuenta_id' => $cuentaId, 'rango' => "{$desde} a {$hasta}", 'tamanio' => $pdf['tamanio'] ?? 0]
+            ['rango' => "{$desde} a {$hasta}", 'tamanio' => $pdf['tamanio'] ?? 0]
         );
 
         $contenido = (string) file_get_contents($pdf['ruta']);

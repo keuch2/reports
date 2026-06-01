@@ -11,7 +11,6 @@ use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\EntidadesMetaRepository;
 use MisterCo\Reports\Services\DashboardService;
-use MisterCo\Reports\Services\PermisosService;
 
 final class CampaniaController
 {
@@ -33,15 +32,9 @@ final class CampaniaController
         }
 
         $dashboard = $this->container->get(DashboardService::class);
-        $cuentaId = (int) $cam['cuenta_publicitaria_id'];
 
-        // Aislamiento: el cliente debe tener acceso a la cuenta de esta campaña,
-        // y la campaña no debe estar marcada como oculta.
-        if (!$dashboard->clienteTieneAccesoACuenta($clienteId, $cuentaId)) {
-            return Response::html('<h1>403 — Sin acceso a esta campaña.</h1>', 403);
-        }
-        $permisos = $this->container->get(PermisosService::class);
-        if (in_array($campaniaId, $permisos->campaniasOcultas($clienteId, $cuentaId), true)) {
+        // Aislamiento: la campaña tiene que estar explícitamente asignada al cliente.
+        if (!$dashboard->clienteTieneAccesoACampania($clienteId, $campaniaId)) {
             return Response::html('<h1>403 — Sin acceso a esta campaña.</h1>', 403);
         }
 

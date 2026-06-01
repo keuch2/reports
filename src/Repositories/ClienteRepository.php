@@ -62,33 +62,61 @@ final class ClienteRepository
         return $this->db->lastInsertId();
     }
 
-    /** @return list<array<string, mixed>> */
-    public function cuentasAsignadas(int $clienteId): array
+    /**
+     * Campañas asignadas a un cliente con su cuenta y moneda.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function campaniasAsignadas(int $clienteId): array
     {
         return $this->db->select(
-            'SELECT cp.id, cp.meta_account_id, cp.nombre, cp.moneda
-               FROM permisos_cliente_cuenta pcc
-               JOIN cuentas_publicitarias cp ON cp.id = pcc.cuenta_publicitaria_id
-              WHERE pcc.cliente_id = :cid
-           ORDER BY cp.nombre',
+            'SELECT c.id, c.meta_campaign_id, c.nombre AS campania, c.objetivo, c.estado,
+                    c.fecha_inicio, c.fecha_fin,
+                    cp.id AS cuenta_id, cp.nombre AS cuenta_nombre, cp.moneda
+               FROM permisos_cliente_campania pccam
+               JOIN campanias c ON c.id = pccam.campania_id
+               JOIN cuentas_publicitarias cp ON cp.id = c.cuenta_publicitaria_id
+              WHERE pccam.cliente_id = :cid
+           ORDER BY cp.nombre, c.nombre',
             ['cid' => $clienteId]
         );
     }
 
-    public function asignarCuenta(int $clienteId, int $cuentaId, ?int $otorgadoPor): void
+    /** @return list<int> IDs de campañas asignadas a un cliente */
+    public function idsCampaniasAsignadas(int $clienteId): array
     {
-        $this->db->execute(
-            'INSERT IGNORE INTO permisos_cliente_cuenta (cliente_id, cuenta_publicitaria_id, otorgado_por_usuario_id)
-                  VALUES (:cli, :cue, :ot)',
-            ['cli' => $clienteId, 'cue' => $cuentaId, 'ot' => $otorgadoPor]
+        $rows = $this->db->select(
+            'SELECT campania_id FROM permisos_cliente_campania WHERE cliente_id = :cid',
+            ['cid' => $clienteId]
         );
+
+        return array_map(static fn ($r) => (int) $r['campania_id'], $rows);
     }
 
-    public function desasignarCuenta(int $clienteId, int $cuentaId): void
+    /**
+     * Reemplaza el set de campañas asignadas a un cliente.
+     *
+     * @param list<int> $campaniasIds
+     */
+    public function reemplazarCampaniasAsignadas(int $clienteId, array $campaniasIds): void
     {
-        $this->db->execute(
-            'DELETE FROM permisos_cliente_cuenta WHERE cliente_id = :cli AND cuenta_publicitaria_id = :cue',
-            ['cli' => $clienteId, 'cue' => $cuentaId]
-        );
+        $this->db->beginTransaction();
+        try {
+            $this->db->execute(
+                'DELETE FROM permisos_cliente_campania WHERE cliente_id = :cid',
+                ['cid' => $clienteId]
+            );
+            foreach ($campaniasIds as $cid) {
+                $this->db->execute(
+                    'INSERT INTO permisos_cliente_campania (cliente_id, campania_id, visible)
+                          VALUES (:cl, :ca, 1)',
+                    ['cl' => $clienteId, 'ca' => (int) $cid]
+                );
+            }
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
 }

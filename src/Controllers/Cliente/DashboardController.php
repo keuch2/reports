@@ -13,6 +13,13 @@ use MisterCo\Reports\Services\DashboardPreferenciasService;
 use MisterCo\Reports\Services\DashboardService;
 use MisterCo\Reports\Services\PermisosService;
 
+/**
+ * Dashboard cliente.
+ *
+ * Modelo nuevo: el cliente ve un único dashboard agregado sobre TODAS las
+ * campañas que tiene asignadas (de cualquier cuenta). KPIs y gráficos suman
+ * todas esas campañas; la tabla las lista una por una indicando su cuenta.
+ */
 final class DashboardController
 {
     public function __construct(private readonly Container $container)
@@ -29,16 +36,13 @@ final class DashboardController
         $view = $this->container->get(View::class);
         $prefs = $this->container->get(DashboardPreferenciasService::class)->obtener($clienteId);
 
-        $cuentas = $service->cuentasDelCliente($clienteId);
-        if ($cuentas === []) {
+        $campaniasAsignadas = $service->campaniasDelCliente($clienteId);
+        if ($campaniasAsignadas === []) {
             return Response::html($view->render('cliente/sin_datos', [
                 'usuario' => $usuario,
                 'titulo' => 'Mi dashboard',
             ]));
         }
-
-        $cuentaIdSolicitada = (int) $request->input('cuenta_id', 0);
-        $cuentaActiva = $this->elegirCuenta($cuentas, $cuentaIdSolicitada);
 
         [$desde, $hasta, $preset] = $this->resolverRango(
             (string) $request->input('preset', $prefs['rango_default']),
@@ -46,9 +50,9 @@ final class DashboardController
             (string) $request->input('hasta', ''),
         );
 
-        $totales = $service->totalesPorCuenta($clienteId, (int) $cuentaActiva['id'], $desde, $hasta);
-        $campanias = $service->porCampania($clienteId, (int) $cuentaActiva['id'], $desde, $hasta);
-        $evolucion = $service->evolucionDiaria($clienteId, (int) $cuentaActiva['id'], $desde, $hasta);
+        $totales = $service->totalesGlobales($clienteId, $desde, $hasta);
+        $campanias = $service->porCampania($clienteId, $desde, $hasta);
+        $evolucion = $service->evolucionDiaria($clienteId, $desde, $hasta);
 
         $permisos = $this->container->get(PermisosService::class);
         $deshabilitadas = $permisos->metricasDeshabilitadas($clienteId);
@@ -57,11 +61,15 @@ final class DashboardController
             static fn (string $w): bool => !in_array($w, $deshabilitadas, true)
         ));
 
+        // Moneda predominante (asumimos que las campañas del cliente comparten moneda;
+        // si no, mostramos la primera y dejamos al admin cuidar la consistencia).
+        $monedaPredominante = (string) ($campaniasAsignadas[0]['moneda'] ?? '');
+
         return Response::html($view->render('cliente/dashboard_meta', [
             'usuario' => $usuario,
-            'titulo' => 'Dashboard · ' . $cuentaActiva['nombre'],
-            'cuentas' => $cuentas,
-            'cuenta_activa' => $cuentaActiva,
+            'titulo' => 'Mi dashboard',
+            'campanias_asignadas_count' => count($campaniasAsignadas),
+            'moneda' => $monedaPredominante,
             'desde' => $desde,
             'hasta' => $hasta,
             'preset' => $preset,
@@ -72,23 +80,6 @@ final class DashboardController
             'widgets_disponibles' => DashboardPreferenciasService::WIDGETS_DISPONIBLES,
             'metricas_deshabilitadas' => $deshabilitadas,
         ]));
-    }
-
-    /**
-     * @param list<array<string,mixed>> $cuentas
-     * @return array<string,mixed>
-     */
-    private function elegirCuenta(array $cuentas, int $idSolicitada): array
-    {
-        if ($idSolicitada > 0) {
-            foreach ($cuentas as $c) {
-                if ((int) $c['id'] === $idSolicitada) {
-                    return $c;
-                }
-            }
-        }
-
-        return $cuentas[0];
     }
 
     /** @return array{0:string,1:string,2:string} [desde, hasta, preset] */

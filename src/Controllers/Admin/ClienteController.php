@@ -12,6 +12,7 @@ use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\ClienteRepository;
 use MisterCo\Reports\Repositories\CuentaPublicitariaRepository;
+use MisterCo\Reports\Repositories\EntidadesMetaRepository;
 use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\PasswordPolicyService;
 
@@ -88,6 +89,9 @@ final class ClienteController
         return Response::redirect('/admin/clientes/' . $clienteId);
     }
 
+    /**
+     * Detalle del cliente: datos + campañas asignadas + UI para asignar/desasignar.
+     */
     public function detalle(Request $request): Response
     {
         $id = (int) ($request->attributes['id'] ?? 0);
@@ -100,52 +104,60 @@ final class ClienteController
         $view = $this->container->get(View::class);
         $session = $this->container->get(Session::class);
         $cuentasRepo = $this->container->get(CuentaPublicitariaRepository::class);
+        $entidadesRepo = $this->container->get(EntidadesMetaRepository::class);
+
+        // Mostrar todas las cuentas con sus campañas para que el admin pueda elegir.
+        $cuentas = $cuentasRepo->listarTodas();
+        $cuentasConCampanias = [];
+        foreach ($cuentas as $cuenta) {
+            $cuentasConCampanias[] = [
+                'cuenta' => $cuenta,
+                'campanias' => $entidadesRepo->campaniasDeCuenta((int) $cuenta['id']),
+            ];
+        }
 
         return Response::html($view->render('admin/clientes_detalle', [
             'usuario' => $request->attributes['usuario'],
             'titulo' => 'Cliente · ' . $cliente['nombre_comercial'],
             'cliente' => $cliente,
-            'cuentas_asignadas' => $repo->cuentasAsignadas($id),
-            'cuentas_disponibles' => $cuentasRepo->listarTodas(),
+            'campanias_asignadas' => $repo->campaniasAsignadas($id),
+            'ids_asignadas' => $repo->idsCampaniasAsignadas($id),
+            'cuentas_con_campanias' => $cuentasConCampanias,
             'success' => $session->getFlash('success'),
             'error' => $session->getFlash('error'),
         ]));
     }
 
-    public function asignarCuenta(Request $request): Response
+    /**
+     * Recibe el listado completo de campaña IDs a asignar al cliente y reemplaza el set.
+     * Si el admin desmarca una campaña, queda desasignada.
+     */
+    public function asignarCampanias(Request $request): Response
     {
         /** @var Usuario $admin */
         $admin = $request->attributes['usuario'];
         $clienteId = (int) ($request->attributes['id'] ?? 0);
-        $cuentaId = (int) $request->input('cuenta_id', 0);
+        $session = $this->container->get(Session::class);
+        $repo = $this->container->get(ClienteRepository::class);
 
-        if ($clienteId > 0 && $cuentaId > 0) {
-            $this->container->get(ClienteRepository::class)->asignarCuenta($clienteId, $cuentaId, $admin->id);
-            $this->container->get(AuditService::class)->registrar(
-                'cliente.cuenta_asignada', $admin, $request->ip, $request->userAgent,
-                'cliente', (string) $clienteId, ['cuenta_id' => $cuentaId]
-            );
-            $this->container->get(Session::class)->flash('success', 'Cuenta asignada.');
+        if ($clienteId <= 0 || $repo->buscarPorId($clienteId) === null) {
+            return Response::redirect('/admin/clientes');
         }
 
-        return Response::redirect('/admin/clientes/' . $clienteId);
-    }
+        $ids = array_values(array_unique(array_map(
+            'intval',
+            (array) ($request->post['campanias'] ?? [])
+        )));
+        $ids = array_filter($ids, static fn (int $id) => $id > 0);
 
-    public function desasignarCuenta(Request $request): Response
-    {
-        /** @var Usuario $admin */
-        $admin = $request->attributes['usuario'];
-        $clienteId = (int) ($request->attributes['id'] ?? 0);
-        $cuentaId = (int) $request->input('cuenta_id', 0);
+        $repo->reemplazarCampaniasAsignadas($clienteId, $ids);
 
-        if ($clienteId > 0 && $cuentaId > 0) {
-            $this->container->get(ClienteRepository::class)->desasignarCuenta($clienteId, $cuentaId);
-            $this->container->get(AuditService::class)->registrar(
-                'cliente.cuenta_desasignada', $admin, $request->ip, $request->userAgent,
-                'cliente', (string) $clienteId, ['cuenta_id' => $cuentaId]
-            );
-            $this->container->get(Session::class)->flash('success', 'Cuenta desasignada.');
-        }
+        $this->container->get(AuditService::class)->registrar(
+            'cliente.campanias_asignadas', $admin, $request->ip, $request->userAgent,
+            'cliente', (string) $clienteId, ['cantidad' => count($ids), 'campania_ids' => array_values($ids)]
+        );
+
+        $session->flash('success', count($ids) . ' campaña(s) asignada(s) al cliente.');
 
         return Response::redirect('/admin/clientes/' . $clienteId);
     }
