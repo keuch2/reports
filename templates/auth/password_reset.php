@@ -13,7 +13,7 @@
 
     <?php if (!$token_valido): ?>
         <div class="alert alert--error">
-            El enlace es inválido o expiró. <a href="/password/solicitar">Solicitá uno nuevo</a>.
+            El enlace es inválido o expiró. <a href="<?= $view->url('/password/solicitar') ?>">Solicitá uno nuevo</a>.
         </div>
     <?php else: ?>
         <?php if ($errores !== []): ?>
@@ -26,7 +26,7 @@
             </div>
         <?php endif; ?>
 
-        <form method="POST" action="/password/reset" class="auth-form">
+        <form method="POST" action="<?= $view->url('/password/reset') ?>" class="auth-form">
             <?= $view->csrfField() ?>
             <input type="hidden" name="token" value="<?= $view->e($token) ?>">
 
@@ -48,6 +48,6 @@
     <?php endif; ?>
 
     <footer class="auth-card__footer">
-        <a href="/login">← Volver al ingreso</a>
+        <a href="<?= $view->url('/login') ?>">← Volver al ingreso</a>
     </footer>
 </div>

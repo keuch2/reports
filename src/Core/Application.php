@@ -57,9 +57,13 @@ final class Application
             (int) $appConfig['session_lifetime_minutes'],
             (bool) $appConfig['session_secure_cookie']
         ));
+        $pathPrefix = (string) ($appConfig['path_prefix'] ?? '');
+        Response::setPathPrefix($pathPrefix);
+        $container->instance('app.path_prefix', (object) ['value' => $pathPrefix]);
         $container->bind(View::class, fn (Container $c) => new View(
             $basePath . '/templates',
             $c->get(Session::class),
+            $pathPrefix,
         ));
         $container->bind(AuditService::class, fn (Container $c) => new AuditService($c->get(Database::class)));
         $container->bind(AuthService::class, fn (Container $c) => new AuthService(
@@ -146,7 +150,8 @@ final class Application
 
     public function run(): void
     {
-        $request = Request::fromGlobals();
+        $prefix = (string) ($this->container->get('app.path_prefix')->value ?? '');
+        $request = Request::fromGlobals($prefix);
 
         try {
             $response = $this->router->dispatch($request, $this->container);

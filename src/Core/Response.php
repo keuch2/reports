@@ -6,12 +6,20 @@ namespace MisterCo\Reports\Core;
 
 final class Response
 {
+    /** Prefijo de URL bajo el que vive la app (ej. "/reports"). Application lo setea al bootstrap. */
+    private static string $pathPrefix = '';
+
     /** @param array<string, string> $headers */
     public function __construct(
         public readonly string $body,
         public readonly int $status = 200,
         public readonly array $headers = [],
     ) {
+    }
+
+    public static function setPathPrefix(string $prefix): void
+    {
+        self::$pathPrefix = rtrim($prefix, '/');
     }
 
     public static function html(string $body, int $status = 200): self
@@ -27,8 +35,16 @@ final class Response
         return new self($body, $status, ['Content-Type' => 'application/json; charset=utf-8']);
     }
 
+    /**
+     * Redirect. Si $url empieza con "/" se prepende automáticamente APP_PATH_PREFIX.
+     * URLs absolutas (http://...) no se modifican.
+     */
     public static function redirect(string $url, int $status = 302): self
     {
+        if (self::$pathPrefix !== '' && str_starts_with($url, '/') && !str_starts_with($url, '//')) {
+            $url = self::$pathPrefix . $url;
+        }
+
         return new self('', $status, ['Location' => $url]);
     }
 

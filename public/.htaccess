@@ -1,11 +1,12 @@
 RewriteEngine On
 
-# Redirigir todo hacia index.php excepto archivos/directorios reales
+# Redirigir todo hacia index.php excepto archivos/directorios reales.
+# Con Alias /reports, REQUEST_FILENAME apunta correctamente al fs absoluto.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.php [L]
+RewriteRule ^(.*)$ /reports/index.php [L]
 
-# Bloquear acceso a archivos sensibles
+# Bloquear acceso a dotfiles
 <FilesMatch "^\.">
     Require all denied
 </FilesMatch>

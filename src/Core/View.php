@@ -14,7 +14,21 @@ final class View
     public function __construct(
         private readonly string $templatesPath,
         private readonly Session $session,
+        private readonly string $pathPrefix = '',
     ) {
+    }
+
+    /**
+     * Construye una URL absoluta-desde-raíz respetando el prefijo de la app.
+     * Útil para href, action, src y cualquier link al backend.
+     */
+    public function url(string $path): string
+    {
+        if ($path === '' || $path[0] !== '/') {
+            $path = '/' . $path;
+        }
+
+        return $this->pathPrefix . $path;
     }
 
     /**

@@ -16,7 +16,7 @@
         <div class="alert alert--error"><?= $view->e((string) $error) ?></div>
     <?php endif; ?>
 
-    <form method="POST" action="/password/solicitar" class="auth-form">
+    <form method="POST" action="<?= $view->url('/password/solicitar') ?>" class="auth-form">
         <?= $view->csrfField() ?>
         <label class="field">
             <span class="field__label">Correo de tu cuenta</span>
@@ -26,6 +26,6 @@
     </form>
 
     <footer class="auth-card__footer">
-        <a href="/login">← Volver al ingreso</a>
+        <a href="<?= $view->url('/login') ?>">← Volver al ingreso</a>
     </footer>
 </div>

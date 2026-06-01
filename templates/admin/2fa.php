@@ -25,7 +25,7 @@
 
         <?php if (!$habilitado && $enrolamiento === null): ?>
             <p class="muted">Recomendado para usuarios admin. Compatible con Google Authenticator, Authy, 1Password.</p>
-            <form method="POST" action="/admin/2fa/iniciar">
+            <form method="POST" action="<?= $view->url('/admin/2fa/iniciar') ?>">
                 <?= $view->csrfField() ?>
                 <button type="submit" class="btn btn--primary">Habilitar 2FA</button>
             </form>
@@ -40,7 +40,7 @@
             </p>
 
             <h3>2. Ingresá el código de 6 dígitos que muestra la app</h3>
-            <form method="POST" action="/admin/2fa/confirmar" class="form-stack" style="max-width:320px">
+            <form method="POST" action="<?= $view->url('/admin/2fa/confirmar') ?>" class="form-stack" style="max-width:320px">
                 <?= $view->csrfField() ?>
                 <label class="field">
                     <span class="field__label">Código</span>
@@ -65,7 +65,7 @@
         <?php endif; ?>
 
         <?php if ($habilitado): ?>
-            <form method="POST" action="/admin/2fa/deshabilitar" style="margin-top:1rem">
+            <form method="POST" action="<?= $view->url('/admin/2fa/deshabilitar') ?>" style="margin-top:1rem">
                 <?= $view->csrfField() ?>
                 <button type="submit" class="btn btn--danger"
                         onclick="return confirm('¿Seguro? Tu cuenta quedará sólo protegida por contraseña.');">

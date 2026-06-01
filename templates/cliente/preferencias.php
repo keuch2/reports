@@ -12,7 +12,7 @@ $widgetsAOrdenar = array_unique(array_merge($preferencias['widgets'], array_keys
 <?= $view->renderPartial('partials/cliente_header', ['usuario' => $usuario]) ?>
 
 <section class="shell__body">
-    <p><a href="/cliente">← Volver al dashboard</a></p>
+    <p><a href="<?= $view->url('/cliente') ?>">← Volver al dashboard</a></p>
     <h1>Mis preferencias</h1>
 
     <?php if ($success): ?><div class="alert alert--success"><?= $view->e((string) $success) ?></div><?php endif; ?>
@@ -20,7 +20,7 @@ $widgetsAOrdenar = array_unique(array_merge($preferencias['widgets'], array_keys
     <article class="card">
         <h2>Widgets del dashboard</h2>
         <p class="muted">Arrastrá para reordenar. Desmarcá los que no quieras ver.</p>
-        <form method="POST" action="/cliente/preferencias" id="prefs-form">
+        <form method="POST" action="<?= $view->url('/cliente/preferencias') ?>" id="prefs-form">
             <?= $view->csrfField() ?>
 
             <ul class="widgets-orden" id="widgets-orden">

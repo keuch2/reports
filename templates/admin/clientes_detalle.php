@@ -13,7 +13,7 @@ $noAsignadas = array_filter($cuentas_disponibles, fn ($c) => !in_array((int) $c[
 <?= $view->renderPartial('partials/admin_header', ['usuario' => $usuario, 'seccion' => 'clientes']) ?>
 
 <section class="shell__body">
-    <p><a href="/admin/clientes">← Volver a clientes</a></p>
+    <p><a href="<?= $view->url('/admin/clientes') ?>">← Volver a clientes</a></p>
     <div class="header-row">
         <div>
             <h1><?= $view->e((string) $cliente['nombre_comercial']) ?></h1>
@@ -22,7 +22,7 @@ $noAsignadas = array_filter($cuentas_disponibles, fn ($c) => !in_array((int) $c[
                 <?php if ($cliente['telefono']): ?> · <?= $view->e((string) $cliente['telefono']) ?><?php endif; ?>
             </p>
         </div>
-        <a href="/admin/clientes/<?= (int) $cliente['id'] ?>/permisos" class="btn btn--primary">Configurar permisos</a>
+        <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/permisos') ?>" class="btn btn--primary">Configurar permisos</a>
     </div>
 
     <?php if ($error): ?><div class="alert alert--error"><?= $view->e((string) $error) ?></div><?php endif; ?>
@@ -42,7 +42,7 @@ $noAsignadas = array_filter($cuentas_disponibles, fn ($c) => !in_array((int) $c[
                         <td><code><?= $view->e((string) $c['meta_account_id']) ?></code></td>
                         <td><?= $view->e((string) ($c['moneda'] ?? '—')) ?></td>
                         <td>
-                            <form method="POST" action="/admin/clientes/<?= (int) $cliente['id'] ?>/desasignar" style="display:inline">
+                            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/desasignar') ?>" style="display:inline">
                                 <?= $view->csrfField() ?>
                                 <input type="hidden" name="cuenta_id" value="<?= (int) $c['id'] ?>">
                                 <button type="submit" class="btn btn--link" onclick="return confirm('¿Quitar acceso?');">Quitar</button>
@@ -58,7 +58,7 @@ $noAsignadas = array_filter($cuentas_disponibles, fn ($c) => !in_array((int) $c[
     <?php if ($noAsignadas !== []): ?>
     <article class="card" style="margin-top:1.5rem">
         <h2>Asignar nueva cuenta</h2>
-        <form method="POST" action="/admin/clientes/<?= (int) $cliente['id'] ?>/asignar" class="form-stack">
+        <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/asignar') ?>" class="form-stack">
             <?= $view->csrfField() ?>
             <label class="field">
                 <span class="field__label">Cuenta publicitaria</span>

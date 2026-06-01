@@ -9,7 +9,7 @@
 <section class="shell__body">
     <div class="header-row">
         <h1>Plantillas PDF</h1>
-        <a href="/admin/plantillas/nueva" class="btn btn--primary">+ Nueva plantilla</a>
+        <a href="<?= $view->url('/admin/plantillas/nueva') ?>" class="btn btn--primary">+ Nueva plantilla</a>
     </div>
 
     <?php if ($success): ?><div class="alert alert--success"><?= $view->e((string) $success) ?></div><?php endif; ?>
@@ -31,8 +31,8 @@
                         <td><?= $p['cliente_nombre'] ? $view->e((string) $p['cliente_nombre']) : '<span class="muted">Todos</span>' ?></td>
                         <td><?= count($secs) ?> secciones</td>
                         <td style="white-space:nowrap">
-                            <a href="/admin/plantillas/<?= (int) $p['id'] ?>/editar" class="btn btn--link">Editar</a>
-                            <form method="POST" action="/admin/plantillas/<?= (int) $p['id'] ?>/eliminar" style="display:inline">
+                            <a href="<?= $view->url('/admin/plantillas/' . ((int) $p['id']) . '/editar') ?>" class="btn btn--link">Editar</a>
+                            <form method="POST" action="<?= $view->url('/admin/plantillas/' . ((int) $p['id']) . '/eliminar') ?>" style="display:inline">
                                 <?= $view->csrfField() ?>
                                 <button type="submit" class="btn btn--link" onclick="return confirm('¿Eliminar plantilla?');">Eliminar</button>
                             </form>

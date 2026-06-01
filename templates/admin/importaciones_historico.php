@@ -8,7 +8,7 @@
 <section class="shell__body">
     <div class="header-row">
         <h1>Histórico de importaciones</h1>
-        <a href="/admin/importar" class="btn btn--primary">+ Nueva importación</a>
+        <a href="<?= $view->url('/admin/importar') ?>" class="btn btn--primary">+ Nueva importación</a>
     </div>
 
     <article class="card">

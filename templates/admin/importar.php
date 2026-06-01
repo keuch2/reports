@@ -23,17 +23,17 @@
 
     <?php if (!$tiene_token): ?>
         <div class="alert alert--warning">
-            No hay un token Meta configurado. <a href="/admin/meta">Conectalo primero</a>.
+            No hay un token Meta configurado. <a href="<?= $view->url('/admin/meta') ?>">Conectalo primero</a>.
         </div>
     <?php elseif ($cuentas === []): ?>
         <div class="alert alert--warning">
             No hay cuentas publicitarias sincronizadas todavía. Reconectá el token desde
-            <a href="/admin/meta">Cuenta Meta</a>.
+            <a href="<?= $view->url('/admin/meta') ?>">Cuenta Meta</a>.
         </div>
     <?php else: ?>
         <article class="card">
             <h2>Nueva importación</h2>
-            <form method="POST" action="/admin/importar" class="form-stack" id="importar-form">
+            <form method="POST" action="<?= $view->url('/admin/importar') ?>" class="form-stack" id="importar-form">
                 <?= $view->csrfField() ?>
                 <label class="field">
                     <span class="field__label">Cuenta publicitaria</span>

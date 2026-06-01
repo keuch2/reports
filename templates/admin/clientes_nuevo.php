@@ -7,7 +7,7 @@
 <section class="shell__body">
     <h1>Nuevo cliente</h1>
     <article class="card">
-        <form method="POST" action="/admin/clientes" class="form-stack">
+        <form method="POST" action="<?= $view->url('/admin/clientes') ?>" class="form-stack">
             <?= $view->csrfField() ?>
 
             <fieldset class="fieldset">
@@ -53,7 +53,7 @@
             </fieldset>
 
             <div class="form-actions">
-                <a href="/admin/clientes" class="btn btn--link">Cancelar</a>
+                <a href="<?= $view->url('/admin/clientes') ?>" class="btn btn--link">Cancelar</a>
                 <button type="submit" class="btn btn--primary">Crear cliente</button>
             </div>
         </form>

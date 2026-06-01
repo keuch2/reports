@@ -53,7 +53,7 @@ $qs = static function (array $extra = []) use ($filtros, $pagina): string {
                 <input class="field__input" type="text" name="buscar" value="<?= $view->e($filtros['buscar']) ?>" placeholder="recurso, detalles...">
             </label>
             <div class="form-actions">
-                <a href="/admin/auditoria" class="btn btn--link">Limpiar</a>
+                <a href="<?= $view->url('/admin/auditoria') ?>" class="btn btn--link">Limpiar</a>
                 <button type="submit" class="btn btn--primary">Filtrar</button>
             </div>
         </form>

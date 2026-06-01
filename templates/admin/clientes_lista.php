@@ -10,7 +10,7 @@
 <section class="shell__body">
     <div class="header-row">
         <h1>Clientes</h1>
-        <a href="/admin/clientes/nuevo" class="btn btn--primary">+ Nuevo cliente</a>
+        <a href="<?= $view->url('/admin/clientes/nuevo') ?>" class="btn btn--primary">+ Nuevo cliente</a>
     </div>
 
     <?php if ($error): ?><div class="alert alert--error"><?= $view->e((string) $error) ?></div><?php endif; ?>
@@ -53,7 +53,7 @@
                                 <?= ((int) $c['activo']) === 1 ? 'activo' : 'inactivo' ?>
                             </span>
                         </td>
-                        <td><a href="/admin/clientes/<?= (int) $c['id'] ?>" class="btn btn--link">Ver</a></td>
+                        <td><a href="<?= $view->url('/admin/clientes/' . ((int) $c['id'])) ?>" class="btn btn--link">Ver</a></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

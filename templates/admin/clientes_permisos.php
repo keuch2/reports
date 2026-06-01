@@ -18,7 +18,7 @@ $camsOcultasSet = array_flip($campanias_ocultas);
 <?= $view->renderPartial('partials/admin_header', ['usuario' => $usuario, 'seccion' => 'clientes']) ?>
 
 <section class="shell__body">
-    <p><a href="/admin/clientes/<?= (int) $cliente['id'] ?>">← Volver al cliente</a></p>
+    <p><a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id'])) ?>">← Volver al cliente</a></p>
     <h1>Permisos · <?= $view->e((string) $cliente['nombre_comercial']) ?></h1>
 
     <?php if ($error): ?><div class="alert alert--error"><?= $view->e((string) $error) ?></div><?php endif; ?>
@@ -26,7 +26,7 @@ $camsOcultasSet = array_flip($campanias_ocultas);
 
     <?php if ($cuentas === []): ?>
         <div class="alert alert--warning">
-            Este cliente no tiene cuentas asignadas. <a href="/admin/clientes/<?= (int) $cliente['id'] ?>">Asigná una primero</a>.
+            Este cliente no tiene cuentas asignadas. <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id'])) ?>">Asigná una primero</a>.
         </div>
     <?php else: ?>
 
@@ -49,12 +49,12 @@ $camsOcultasSet = array_flip($campanias_ocultas);
     <?php if ($campanias === []): ?>
         <article class="card" style="margin-top:1.5rem">
             <p class="muted">No hay campañas importadas para esta cuenta todavía.
-                <a href="/admin/importar">Importá primero</a>.</p>
+                <a href="<?= $view->url('/admin/importar') ?>">Importá primero</a>.</p>
         </article>
     <?php else: ?>
         <article class="card" style="margin-top:1.5rem">
             <h2>Campañas (<?= count($campanias) ?>)</h2>
-            <form method="POST" action="/admin/clientes/<?= (int) $cliente['id'] ?>/permisos/campanias">
+            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/permisos/campanias') ?>">
                 <?= $view->csrfField() ?>
                 <input type="hidden" name="cuenta_id" value="<?= $cuenta_id ?>">
                 <table class="table">
@@ -94,7 +94,7 @@ $camsOcultasSet = array_flip($campanias_ocultas);
                             <span class="badge badge--fallida"><?= count($anuncios_ocultos[$cid]) ?> ocultos</span>
                         <?php endif; ?>
                     </summary>
-                    <form method="POST" action="/admin/clientes/<?= (int) $cliente['id'] ?>/permisos/anuncios" style="margin-top:1rem">
+                    <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/permisos/anuncios') ?>" style="margin-top:1rem">
                         <?= $view->csrfField() ?>
                         <input type="hidden" name="cuenta_id" value="<?= $cuenta_id ?>">
                         <input type="hidden" name="campania_id" value="<?= $cid ?>">
@@ -129,7 +129,7 @@ $camsOcultasSet = array_flip($campanias_ocultas);
     <article class="card" style="margin-top:1.5rem">
         <h2>Métricas habilitadas para este cliente</h2>
         <p class="muted">Marcá las que querés <strong>deshabilitar</strong>. Aplican a dashboard y PDFs.</p>
-        <form method="POST" action="/admin/clientes/<?= (int) $cliente['id'] ?>/permisos/metricas">
+        <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/permisos/metricas') ?>">
             <?= $view->csrfField() ?>
             <input type="hidden" name="cuenta_id" value="<?= $cuenta_id ?>">
 

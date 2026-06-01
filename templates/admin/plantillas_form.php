@@ -12,7 +12,7 @@ $action = $esEdicion ? '/admin/plantillas/' . (int) $plantilla['id'] : '/admin/p
 <?= $view->renderPartial('partials/admin_header', ['usuario' => $usuario, 'seccion' => 'plantillas']) ?>
 
 <section class="shell__body">
-    <p><a href="/admin/plantillas">← Volver a plantillas</a></p>
+    <p><a href="<?= $view->url('/admin/plantillas') ?>">← Volver a plantillas</a></p>
     <h1><?= $esEdicion ? 'Editar plantilla' : 'Nueva plantilla' ?></h1>
 
     <article class="card">
@@ -56,7 +56,7 @@ $action = $esEdicion ? '/admin/plantillas/' . (int) $plantilla['id'] : '/admin/p
             </fieldset>
 
             <div class="form-actions">
-                <a href="/admin/plantillas" class="btn btn--link">Cancelar</a>
+                <a href="<?= $view->url('/admin/plantillas') ?>" class="btn btn--link">Cancelar</a>
                 <button type="submit" class="btn btn--primary"><?= $esEdicion ? 'Guardar cambios' : 'Crear plantilla' ?></button>
             </div>
         </form>

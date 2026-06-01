@@ -17,7 +17,7 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
 <?= $view->renderPartial('partials/cliente_header', ['usuario' => $usuario]) ?>
 
 <section class="shell__body">
-    <form method="GET" action="/cliente" class="dashboard-filters">
+    <form method="GET" action="<?= $view->url('/cliente') ?>" class="dashboard-filters">
         <?php if (count($cuentas) > 1): ?>
             <label class="field">
                 <span class="field__label">Cuenta</span>
@@ -45,7 +45,7 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
             </select>
         </label>
 
-        <a href="/cliente/reporte/previa?cuenta_id=<?= (int) $cuenta_activa['id'] ?>&preset=<?= $view->e($preset) ?>"
+        <a href="<?= $view->url('/cliente/reporte/previa?cuenta_id=' . ((int) $cuenta_activa['id']) . '&preset=' . ($view->e($preset))) ?>"
            class="btn btn--primary">📄 Exportar PDF</a>
     </form>
 
@@ -73,7 +73,7 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
             </div>
         <?php endforeach; ?>
         <?php if ($widgets_visibles === []): ?>
-            <p class="muted">No hay widgets configurados. Ajustá tus <a href="/cliente/preferencias">preferencias</a>.</p>
+            <p class="muted">No hay widgets configurados. Ajustá tus <a href="<?= $view->url('/cliente/preferencias') ?>">preferencias</a>.</p>
         <?php endif; ?>
     </div>
 
@@ -108,7 +108,7 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                 <tbody>
                 <?php foreach ($campanias as $c): ?>
                     <tr>
-                        <td><a href="/cliente/campanias/<?= (int) $c['campania_id'] ?>"><?= $view->e((string) $c['campania']) ?></a></td>
+                        <td><a href="<?= $view->url('/cliente/campanias/' . ((int) $c['campania_id'])) ?>"><?= $view->e((string) $c['campania']) ?></a></td>
                         <td><?= $view->e((string) ($c['objetivo'] ?? '—')) ?></td>
                         <td><?= $view->e((string) ($c['estado'] ?? '—')) ?></td>
                         <td class="num"><?= $fmtMoneda($c['gasto']) ?></td>

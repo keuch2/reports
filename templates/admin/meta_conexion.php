@@ -22,7 +22,7 @@
         <h2>Token de System User</h2>
         <?php if ($tiene_token): ?>
             <p>Hay un token configurado. <span class="muted">(El valor no se muestra por seguridad.)</span></p>
-            <form method="POST" action="/admin/meta/desconectar" onsubmit="return confirm('¿Eliminar el token? No podrás importar hasta reconectarlo.');">
+            <form method="POST" action="<?= $view->url('/admin/meta/desconectar') ?>" onsubmit="return confirm('¿Eliminar el token? No podrás importar hasta reconectarlo.');">
                 <?= $view->csrfField() ?>
                 <button type="submit" class="btn btn--danger">Desconectar</button>
             </form>
@@ -30,7 +30,7 @@
             <p class="muted">Pegá el token de System User del Business Manager. Se validará contra <code>me/adaccounts</code> antes de guardar.</p>
         <?php endif; ?>
 
-        <form method="POST" action="/admin/meta/conectar" class="form-stack" style="margin-top:1rem">
+        <form method="POST" action="<?= $view->url('/admin/meta/conectar') ?>" class="form-stack" style="margin-top:1rem">
             <?= $view->csrfField() ?>
             <label class="field">
                 <span class="field__label"><?= $tiene_token ? 'Reemplazar token' : 'Nuevo token' ?></span>

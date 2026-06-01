@@ -7,11 +7,11 @@
 <?= $view->renderPartial('partials/cliente_header', ['usuario' => $usuario]) ?>
 
 <section class="shell__body">
-    <p><a href="/cliente">← Volver al dashboard</a></p>
+    <p><a href="<?= $view->url('/cliente') ?>">← Volver al dashboard</a></p>
     <h1>Generar reporte PDF</h1>
 
     <article class="card">
-        <form method="POST" action="/cliente/reporte.pdf" class="form-stack">
+        <form method="POST" action="<?= $view->url('/cliente/reporte.pdf') ?>" class="form-stack">
             <?= $view->csrfField() ?>
             <input type="hidden" name="cuenta_id" value="<?= (int) $cuenta_id ?>">
             <input type="hidden" name="preset" value="<?= $view->e($preset) ?>">
@@ -29,7 +29,7 @@
             </label>
 
             <div class="form-actions">
-                <a href="/cliente" class="btn btn--link">Cancelar</a>
+                <a href="<?= $view->url('/cliente') ?>" class="btn btn--link">Cancelar</a>
                 <button type="submit" class="btn btn--primary">📄 Descargar PDF</button>
             </div>
         </form>

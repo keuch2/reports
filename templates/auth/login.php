@@ -15,7 +15,7 @@
         </div>
     <?php endif; ?>
 
-    <form method="POST" action="/login" class="auth-form" novalidate>
+    <form method="POST" action="<?= $view->url('/login') ?>" class="auth-form" novalidate>
         <?= $view->csrfField() ?>
 
         <label class="field">
@@ -34,7 +34,7 @@
     </form>
 
     <footer class="auth-card__footer">
-        <a href="/password/solicitar">¿Olvidaste tu contraseña?</a>
+        <a href="<?= $view->url('/password/solicitar') ?>">¿Olvidaste tu contraseña?</a>
         <br><br>
         <small>© <?= date('Y') ?> Mister Co. · mister.com.py</small>
     </footer>

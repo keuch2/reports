@@ -12,7 +12,7 @@
         <div class="alert alert--error"><?= $view->e((string) $error) ?></div>
     <?php endif; ?>
 
-    <form method="POST" action="/2fa" class="auth-form">
+    <form method="POST" action="<?= $view->url('/2fa') ?>" class="auth-form">
         <?= $view->csrfField() ?>
         <p class="muted">Ingresá el código de 6 dígitos de tu app de autenticación (o un código de backup).</p>
         <label class="field">
@@ -24,6 +24,6 @@
     </form>
 
     <footer class="auth-card__footer">
-        <a href="/login">← Cancelar</a>
+        <a href="<?= $view->url('/login') ?>">← Cancelar</a>
     </footer>
 </div>

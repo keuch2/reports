@@ -16,7 +16,7 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
 <?= $view->renderPartial('partials/cliente_header', ['usuario' => $usuario]) ?>
 
 <section class="shell__body">
-    <p><a href="/cliente">← Volver al dashboard</a></p>
+    <p><a href="<?= $view->url('/cliente') ?>">← Volver al dashboard</a></p>
 
     <h1><?= $view->e((string) $campania['nombre']) ?></h1>
     <p class="muted">
