@@ -35,15 +35,16 @@ final class ImportacionController
         $tokenService = $this->container->get(MetaTokenService::class);
 
         $cuentas = $cuentasRepo->listarTodas();
-        // Mapa cuenta_id => última fecha importada (para sugerir incremental).
         $ultimasFechas = [];
         $campaniasPorCuenta = [];
         foreach ($cuentas as $c) {
             $cid = (int) $c['id'];
             $ultimasFechas[$cid] = $importRepo->ultimaFechaImportada($cid);
-            // Solo cargamos campañas si ya tiene alguna importada (evita N queries vacías).
-            if ($ultimasFechas[$cid] !== null) {
-                $campaniasPorCuenta[$cid] = $entidadesRepo->campaniasDeCuenta($cid);
+            // Cargamos las campañas persistidas (no las de Meta). Si la cuenta nunca tuvo
+            // importación, la query devuelve [] y no rompe; el fieldset no se muestra.
+            $camps = $entidadesRepo->campaniasDeCuenta($cid);
+            if ($camps !== []) {
+                $campaniasPorCuenta[$cid] = $camps;
             }
         }
 

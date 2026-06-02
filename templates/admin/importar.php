@@ -95,6 +95,10 @@ foreach ($campanias_por_cuenta as $cuentaId => $camps) {
                     </p>
                 </fieldset>
 
+                <div id="campanias-sin-conocer" class="alert alert--warning" style="display:none;font-size:0.88rem">
+                    No tenemos campañas conocidas de esta cuenta todavía. La importación va a traer todas las campañas + métricas del rango. Después podrás importar selectivamente.
+                </div>
+
                 <p class="muted">Se traen campañas, conjuntos, anuncios y métricas diarias a nivel anuncio.</p>
                 <button type="submit" class="btn btn--primary" id="importar-btn">
                     Importar
@@ -158,10 +162,13 @@ const modoLabel = document.getElementById('campanias-modo');
 
 function renderCampanias(cuentaId) {
     const camps = campaniasPorCuenta[cuentaId] || [];
+    const sinConocer = document.getElementById('campanias-sin-conocer');
     if (camps.length === 0) {
         fieldset.style.display = 'none';
+        sinConocer.style.display = cuentaId ? '' : 'none';
         return;
     }
+    sinConocer.style.display = 'none';
     fieldset.style.display = '';
     lista.innerHTML = camps.map(c => {
         const obj = c.objetivo ? ` <small style="color:var(--color-muted)">· ${c.objetivo}</small>` : '';
