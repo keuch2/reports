@@ -105,10 +105,10 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                 </thead>
                 <tbody>
                 <?php foreach ($adsets as $g):
-                    // Sublabel del resultado según el OBJETIVO de la campaña padre.
-                    $labelCorto = ObjetivoCampania::nombreCortoResultados(
-                        (string) ($g['objetivo_campania'] ?? $objetivo)
-                    );
+                    // Mismo criterio que Meta: prioriza optimization_goal del adset,
+                    // luego cae al objetivo de la campaña.
+                    $sublabelSrc = $g['optimization_goal'] ?: ($g['objetivo_campania'] ?? $objetivo);
+                    $labelCorto = ObjetivoCampania::nombreCortoResultados((string) $sublabelSrc);
                 ?>
                     <tr>
                         <td><strong><?= $view->e((string) $g['adset_nombre']) ?></strong>

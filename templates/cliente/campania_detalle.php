@@ -98,9 +98,8 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                 </thead>
                 <tbody>
                 <?php foreach ($adsets as $g):
-                    $labelCorto = ObjetivoCampania::nombreCortoResultados(
-                        (string) ($g['objetivo_campania'] ?? $objetivo)
-                    );
+                    $sublabelSrc = $g['optimization_goal'] ?: ($g['objetivo_campania'] ?? $objetivo);
+                    $labelCorto = ObjetivoCampania::nombreCortoResultados((string) $sublabelSrc);
                 ?>
                     <tr>
                         <td><strong><?= $view->e((string) $g['adset_nombre']) ?></strong>

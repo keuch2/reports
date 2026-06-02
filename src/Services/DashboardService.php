@@ -265,10 +265,15 @@ final class DashboardService
                 COALESCE(SUM(ms.conversaciones), 0) AS conversaciones,
                 COALESCE(SUM(ms.landing_page_views), 0) AS landing_page_views,
                 COALESCE(SUM(ms.leads), 0) AS leads,
-                -- Resultados se reporta segun el OBJETIVO de la campaña.
-                -- optimization_goal del adset es estrategia de subasta, no metrica
-                -- de negocio (p.ej. CONVERSATIONS = pujar por clicks a WA).
+                -- Resultados: mismo criterio que Meta Ads Manager. La columna
+                -- de Resultados refleja el optimization_goal del adset (es lo que
+                -- realmente se optimiza). Si no esta seteado, cae al objetivo de
+                -- la campaña.
                 CASE
+                    WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') THEN SUM(ms.conversaciones)
+                    WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') THEN SUM(ms.leads)
+                    WHEN cs.optimization_goal = 'LANDING_PAGE_VIEWS' THEN SUM(ms.landing_page_views)
+                    WHEN cs.optimization_goal = 'LINK_CLICKS' THEN SUM(ms.clicks_totales)
                     WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN SUM(ms.leads)
                     WHEN c.objetivo IN ('MESSAGES','OUTCOME_ENGAGEMENT') THEN SUM(ms.conversaciones)
                     WHEN c.objetivo IN ('OUTCOME_TRAFFIC','LINK_CLICKS') THEN SUM(ms.landing_page_views)
@@ -282,6 +287,14 @@ final class DashboardService
                      THEN SUM(ms.gasto) / SUM(ms.clicks_totales)
                      ELSE NULL END AS cpc,
                 CASE
+                    WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') AND SUM(ms.conversaciones) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.conversaciones)
+                    WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') AND SUM(ms.leads) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.leads)
+                    WHEN cs.optimization_goal = 'LANDING_PAGE_VIEWS' AND SUM(ms.landing_page_views) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.landing_page_views)
+                    WHEN cs.optimization_goal = 'LINK_CLICKS' AND SUM(ms.clicks_totales) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.clicks_totales)
                     WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') AND SUM(ms.leads) > 0
                         THEN SUM(ms.gasto) / SUM(ms.leads)
                     WHEN c.objetivo IN ('MESSAGES','OUTCOME_ENGAGEMENT') AND SUM(ms.conversaciones) > 0
@@ -337,9 +350,14 @@ final class DashboardService
                 COALESCE(SUM(ms.conversaciones), 0) AS conversaciones,
                 COALESCE(SUM(ms.landing_page_views), 0) AS landing_page_views,
                 COALESCE(SUM(ms.leads), 0) AS leads,
-                -- Resultado se decide por el OBJETIVO de la campaña (no por
-                -- optimization_goal del adset, que es estrategia de subasta).
+                -- Mismo criterio que Meta Ads Manager: optimization_goal del adset
+                -- gana sobre objective de campaña. Campañas LEADS con adsets que
+                -- optimizan CONVERSATIONS reportan conversaciones, no leads.
                 CASE
+                    WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') THEN SUM(ms.conversaciones)
+                    WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') THEN SUM(ms.leads)
+                    WHEN cs.optimization_goal = 'LANDING_PAGE_VIEWS' THEN SUM(ms.landing_page_views)
+                    WHEN cs.optimization_goal = 'LINK_CLICKS' THEN SUM(ms.clicks_totales)
                     WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN SUM(ms.leads)
                     WHEN c.objetivo IN ('MESSAGES','OUTCOME_ENGAGEMENT') THEN SUM(ms.conversaciones)
                     WHEN c.objetivo IN ('OUTCOME_TRAFFIC','LINK_CLICKS') THEN SUM(ms.landing_page_views)
@@ -353,6 +371,14 @@ final class DashboardService
                      THEN SUM(ms.gasto) / SUM(ms.clicks_totales)
                      ELSE NULL END AS cpc,
                 CASE
+                    WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') AND SUM(ms.conversaciones) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.conversaciones)
+                    WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') AND SUM(ms.leads) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.leads)
+                    WHEN cs.optimization_goal = 'LANDING_PAGE_VIEWS' AND SUM(ms.landing_page_views) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.landing_page_views)
+                    WHEN cs.optimization_goal = 'LINK_CLICKS' AND SUM(ms.clicks_totales) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.clicks_totales)
                     WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') AND SUM(ms.leads) > 0
                         THEN SUM(ms.gasto) / SUM(ms.leads)
                     WHEN c.objetivo IN ('MESSAGES','OUTCOME_ENGAGEMENT') AND SUM(ms.conversaciones) > 0
