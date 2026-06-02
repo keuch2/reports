@@ -76,8 +76,8 @@ final class ImportacionService
      * Meta los devuelve dentro de `creative{...}` cuando se piden en la query del ad.
      */
     private const CREATIVE_FIELDS = [
-        'id', 'body', 'title', 'image_url', 'thumbnail_url',
-        'object_story_spec', 'call_to_action_type', 'link_url',
+        'id', 'body', 'title', 'image_url', 'thumbnail_url', 'image_hash',
+        'object_story_spec', 'asset_feed_spec', 'call_to_action_type', 'link_url',
         'effective_object_story_id', 'instagram_permalink_url',
     ];
 
@@ -122,6 +122,8 @@ final class ImportacionService
         $adsets = 0;
         $anuncios = 0;
         $snapshots = 0;
+        // Cache de hash → URL HD para reducir llamadas a /adimages.
+        $cacheHashUrl = [];
         $warnings = [];
 
         try {
@@ -251,6 +253,29 @@ final class ImportacionService
                         }
                     } catch (\Throwable) {
                         // si el creative no es accesible por permisos, dejamos lo que ya teníamos
+                    }
+                }
+
+                // Si tenemos image_hash, resolverlo a la URL HD desde /act_{id}/adimages.
+                // image_url del creative suele ser thumbnail; adimages devuelve la imagen original.
+                if (!empty($datosCreative['image_hash'])) {
+                    $hash = (string) $datosCreative['image_hash'];
+                    if (!array_key_exists($hash, $cacheHashUrl)) {
+                        try {
+                            $resp = $cliente->get("act_{$metaAccountId}/adimages", [
+                                'fields' => ['url', 'permalink_url', 'width', 'height'],
+                                'hashes' => json_encode([$hash]),
+                            ]);
+                            $llamadas++;
+                            $primero = $resp['data'][0] ?? null;
+                            $cacheHashUrl[$hash] = is_array($primero) && !empty($primero['url'])
+                                ? (string) $primero['url'] : null;
+                        } catch (\Throwable) {
+                            $cacheHashUrl[$hash] = null;
+                        }
+                    }
+                    if ($cacheHashUrl[$hash] !== null) {
+                        $datosCreative['image_url'] = $cacheHashUrl[$hash];
                     }
                 }
 
@@ -408,7 +433,7 @@ final class ImportacionService
      *
      * @param array<string,mixed> $creative
      * @return array{creative_id:?string, tipo:?string, thumbnail_url:?string, cuerpo:?string,
-     *               titulo:?string, link_url:?string, image_url:?string,
+     *               titulo:?string, link_url:?string, image_url:?string, image_hash:?string,
      *               call_to_action:?string, permalink_url:?string}
      */
     private function extraerCreative(array $creative, string $permalinkFallback): array
@@ -416,6 +441,7 @@ final class ImportacionService
         $creativeId = isset($creative['id']) ? (string) $creative['id'] : null;
         $thumbnail = $creative['thumbnail_url'] ?? null;
         $image = $creative['image_url'] ?? null;
+        $imageHash = $creative['image_hash'] ?? null;
         $body = $creative['body'] ?? null;
         $title = $creative['title'] ?? null;
         $linkUrl = $creative['link_url'] ?? null;
@@ -434,9 +460,19 @@ final class ImportacionService
                 $title = $title ?? ($data['name'] ?? null);
                 $linkUrl = $linkUrl ?? ($data['link'] ?? null);
                 $image = $image ?? ($data['picture'] ?? null);
+                $imageHash = $imageHash ?? ($data['image_hash'] ?? null);
                 if (isset($data['call_to_action']['type'])) {
                     $cta = $cta ?? $data['call_to_action']['type'];
                 }
+            }
+        }
+
+        // asset_feed_spec (anuncios dinámicos): images[].hash trae el hash en mejor calidad.
+        $assetFeed = $creative['asset_feed_spec'] ?? null;
+        if (is_array($assetFeed) && $imageHash === null) {
+            $firstImg = $assetFeed['images'][0] ?? null;
+            if (is_array($firstImg)) {
+                $imageHash = $firstImg['hash'] ?? null;
             }
         }
 
@@ -468,6 +504,7 @@ final class ImportacionService
             'titulo' => $title !== null ? (string) $title : null,
             'link_url' => $linkUrl !== null ? (string) $linkUrl : null,
             'image_url' => $image !== null ? (string) $image : null,
+            'image_hash' => $imageHash !== null ? (string) $imageHash : null,
             'call_to_action' => $cta !== null ? (string) $cta : null,
             'permalink_url' => $permalinkUrl,
         ];
@@ -493,11 +530,11 @@ final class ImportacionService
      * vienen vacíos.
      *
      * @param array{creative_id:?string, tipo:?string, thumbnail_url:?string, cuerpo:?string,
-     *               titulo:?string, link_url:?string, image_url:?string,
+     *               titulo:?string, link_url:?string, image_url:?string, image_hash:?string,
      *               call_to_action:?string, permalink_url:?string} $datos
      * @param array<string,mixed> $post
      * @return array{creative_id:?string, tipo:?string, thumbnail_url:?string, cuerpo:?string,
-     *                titulo:?string, link_url:?string, image_url:?string,
+     *                titulo:?string, link_url:?string, image_url:?string, image_hash:?string,
      *                call_to_action:?string, permalink_url:?string}
      */
     private function complementarConPost(array $datos, array $post): array
@@ -505,12 +542,16 @@ final class ImportacionService
         if (empty($datos['cuerpo']) && !empty($post['message'])) {
             $datos['cuerpo'] = (string) $post['message'];
         }
-        $fullPicture = $post['full_picture'] ?? $post['picture'] ?? null;
-        if (empty($datos['image_url']) && $fullPicture !== null) {
+        // full_picture es siempre la versión HD del post; picture es un thumbnail. Preferir full_picture
+        // incluso si ya teníamos image_url (los thumbnails del creative suelen ser de 320px).
+        $fullPicture = $post['full_picture'] ?? null;
+        if ($fullPicture !== null) {
             $datos['image_url'] = (string) $fullPicture;
+        } elseif (empty($datos['image_url']) && !empty($post['picture'])) {
+            $datos['image_url'] = (string) $post['picture'];
         }
-        if (empty($datos['thumbnail_url']) && $fullPicture !== null) {
-            $datos['thumbnail_url'] = (string) $fullPicture;
+        if (empty($datos['thumbnail_url']) && ($fullPicture !== null || !empty($post['picture']))) {
+            $datos['thumbnail_url'] = (string) ($fullPicture ?? $post['picture']);
         }
         if (empty($datos['permalink_url']) && !empty($post['permalink_url'])) {
             $datos['permalink_url'] = (string) $post['permalink_url'];
