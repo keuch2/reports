@@ -88,6 +88,13 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
         <?php endif; ?>
     </div>
 
+    <?php if (!empty($evolucion ?? [])): ?>
+        <article class="card" style="margin-top:1.5rem">
+            <h2>Evolución diaria</h2>
+            <canvas id="grafico-evolucion-campania" height="120"></canvas>
+        </article>
+    <?php endif; ?>
+
     <article class="card" style="margin-top:1.5rem">
         <h2>Grupos de anuncios (<?= count($adsets) ?>)</h2>
         <?php if ($adsets === []): ?>
@@ -179,3 +186,28 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
         <?php endif; ?>
     </article>
 </section>
+
+<?php if (!empty($evolucion ?? [])): ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+    const evolucion = <?= json_encode($evolucion, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK) ?>;
+    new Chart(document.getElementById('grafico-evolucion-campania'), {
+        type: 'line',
+        data: {
+            labels: evolucion.map(e => e.fecha),
+            datasets: [
+                { label: 'Gasto (<?= $view->e($mon) ?>)', data: evolucion.map(e => e.gasto), borderColor: '#1a2f6e', backgroundColor: 'rgba(26,47,110,0.08)', tension: 0.3, yAxisID: 'y1', fill: true },
+                { label: <?= json_encode($labelResultadosCorto) ?>, data: evolucion.map(e => e.resultados), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)', tension: 0.3, yAxisID: 'y2', fill: true }
+            ]
+        },
+        options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                y1: { position: 'left', title: { display: true, text: 'Gasto' }, beginAtZero: true },
+                y2: { position: 'right', title: { display: true, text: <?= json_encode($labelResultadosCorto) ?> }, grid: { drawOnChartArea: false }, beginAtZero: true, ticks: { precision: 0 } }
+            }
+        }
+    });
+</script>
+<?php endif; ?>

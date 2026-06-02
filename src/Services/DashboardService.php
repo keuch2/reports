@@ -171,6 +171,54 @@ final class DashboardService
     }
 
     /**
+     * Serie temporal diaria de una campaña: gasto + resultados según el
+     * optimization_goal predominante de la campaña (o el objective si no hay).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function evolucionDiariaCampania(int $clienteId, int $campaniaId, string $desde, string $hasta): array
+    {
+        $this->asegurarAccesoCampania($clienteId, $campaniaId);
+        $params = ['cam' => $campaniaId, 'desde' => $desde, 'hasta' => $hasta];
+        $exclAnunciosSql = '';
+        $ocultos = $this->permisos->anunciosOcultosDeCampania($clienteId, $campaniaId);
+        if ($ocultos !== []) {
+            [$ph, $exclParams] = $this->placeholders($ocultos, 'exc_a');
+            $exclAnunciosSql = "AND a.id NOT IN ({$ph})";
+            $params = array_merge($params, $exclParams);
+        }
+
+        return $this->db->select(
+            "SELECT
+                ms.fecha,
+                COALESCE(SUM(ms.gasto), 0) AS gasto,
+                CASE
+                    WHEN COALESCE((SELECT GROUP_CONCAT(DISTINCT cs2.optimization_goal)
+                                   FROM conjuntos_anuncios cs2
+                                  WHERE cs2.campania_id = c.id), '') LIKE '%CONVERSATIONS%' THEN SUM(ms.conversaciones)
+                    WHEN COALESCE((SELECT GROUP_CONCAT(DISTINCT cs2.optimization_goal)
+                                   FROM conjuntos_anuncios cs2
+                                  WHERE cs2.campania_id = c.id), '') LIKE '%LEAD_GENERATION%' THEN SUM(ms.leads)
+                    WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN SUM(ms.leads)
+                    WHEN c.objetivo IN ('MESSAGES','OUTCOME_ENGAGEMENT') THEN SUM(ms.conversaciones)
+                    WHEN c.objetivo IN ('OUTCOME_TRAFFIC','LINK_CLICKS') THEN SUM(ms.landing_page_views)
+                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.resultados)
+                    ELSE 0
+                END AS resultados
+              FROM metricas_snapshots ms
+              JOIN anuncios a ON a.id = ms.entidad_id AND ms.nivel = 'ad'
+              JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
+              JOIN campanias c ON c.id = cs.campania_id
+             WHERE cs.campania_id = :cam
+               AND ms.fecha BETWEEN :desde AND :hasta
+               {$exclAnunciosSql}
+          GROUP BY ms.fecha, c.id, c.objetivo
+          ORDER BY ms.fecha",
+            $params
+        );
+    }
+
+    /**
      * Totales de una campaña específica (sirve para detalle).
      *
      * @return array<string, mixed>

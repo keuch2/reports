@@ -120,8 +120,9 @@ final class PreviewClienteController
         $analisisService = $this->container->get(AnalisisCampaniaService::class);
         [$prevDesde, $prevHasta] = $analisisService->rangoAnterior($desde, $hasta);
         $totalesPrevios = $service->totalesCampania($clienteId, $campaniaId, $prevDesde, $prevHasta);
+        $optGoalPredominante = $entidades->optimizationGoalPredominante($campaniaId);
         $campaniaConGoal = $cam + [
-            'optimization_goal_predominante' => $entidades->optimizationGoalPredominante($campaniaId),
+            'optimization_goal_predominante' => $optGoalPredominante,
         ];
         $analisis = $analisisService->generar(
             $totales,
@@ -131,6 +132,8 @@ final class PreviewClienteController
             $desde,
             $hasta,
         );
+
+        $evolucion = $service->evolucionDiariaCampania($clienteId, $campaniaId, $desde, $hasta);
 
         $view = $this->container->get(View::class);
 
@@ -146,6 +149,7 @@ final class PreviewClienteController
             'hasta' => $hasta,
             'preset' => $preset,
             'analisis' => $analisis,
+            'evolucion' => $evolucion,
         ]));
     }
 

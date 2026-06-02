@@ -78,13 +78,6 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
         <?php endforeach; ?>
     </div>
 
-    <?php if ($campanias !== []): ?>
-        <article class="card" style="margin-top:1.5rem">
-            <h2>Evolución diaria</h2>
-            <canvas id="grafico-evolucion" height="120"></canvas>
-        </article>
-
-    <?php endif; ?>
 
     <article class="card" style="margin-top:1.5rem">
         <h2>Campañas (<?= count($campanias) ?>)</h2>
@@ -129,32 +122,3 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
     <?php endif; ?>
 </section>
 
-<?php if ($campanias !== []): ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script>
-    const evolucion = <?= json_encode($evolucion, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK) ?>;
-    const campanias = <?= json_encode($campanias, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK) ?>;
-
-    if (evolucion.length > 0) {
-        new Chart(document.getElementById('grafico-evolucion'), {
-            type: 'line',
-            data: {
-                labels: evolucion.map(e => e.fecha),
-                datasets: [
-                    { label: 'Gasto', data: evolucion.map(e => e.gasto), borderColor: '#1a2f6e', tension: 0.3, yAxisID: 'y1' },
-                    { label: 'Impresiones', data: evolucion.map(e => e.impresiones), borderColor: '#10b981', tension: 0.3, yAxisID: 'y2' }
-                ]
-            },
-            options: {
-                responsive: true,
-                interaction: { mode: 'index', intersect: false },
-                scales: {
-                    y1: { position: 'left', title: { display: true, text: 'Gasto' } },
-                    y2: { position: 'right', title: { display: true, text: 'Impresiones' }, grid: { drawOnChartArea: false } }
-                }
-            }
-        });
-    }
-
-</script>
-<?php endif; ?>
