@@ -66,6 +66,9 @@ return function (Router $router): void {
     $router->post('/admin/clientes', [AdminClienteController::class, 'crear'], $adminCsrf);
     $router->get('/admin/clientes/{id}', [AdminClienteController::class, 'detalle'], $admin);
     $router->post('/admin/clientes/{id}/asignar', [AdminClienteController::class, 'asignarCampanias'], $adminCsrf);
+    $router->post('/admin/clientes/{id}/editar', [AdminClienteController::class, 'actualizarDatos'], $adminCsrf);
+    $router->post('/admin/clientes/{id}/usuario', [AdminClienteController::class, 'actualizarUsuario'], $adminCsrf);
+    $router->post('/admin/clientes/{id}/password', [AdminClienteController::class, 'cambiarPassword'], $adminCsrf);
 
     // Preview del dashboard del cliente desde sesión admin (solo lectura)
     $router->get('/admin/clientes/{id}/dashboard', [PreviewClienteController::class, 'dashboard'], $admin);

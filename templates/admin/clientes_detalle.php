@@ -2,6 +2,7 @@
 /** @var \MisterCo\Reports\Core\View $view */
 /** @var \MisterCo\Reports\Domain\Usuario $usuario */
 /** @var array<string,mixed> $cliente */
+/** @var array<string,mixed>|null $usuario_primario */
 /** @var list<array<string,mixed>> $campanias_asignadas */
 /** @var list<int> $ids_asignadas */
 /** @var list<array{cuenta:array<string,mixed>, campanias:list<array<string,mixed>>}> $cuentas_con_campanias */
@@ -37,6 +38,85 @@ $asignadasSet = array_flip($ids_asignadas);
     <?php if ($success): ?><div class="alert alert--success"><?= $view->e((string) $success) ?></div><?php endif; ?>
 
     <article class="card">
+        <h2>Datos del cliente</h2>
+        <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/editar') ?>" class="form-stack">
+            <?= $view->csrfField() ?>
+            <div class="field-row">
+                <label class="field">
+                    <span class="field__label">Nombre comercial *</span>
+                    <input class="field__input" type="text" name="nombre_comercial"
+                           value="<?= $view->e((string) $cliente['nombre_comercial']) ?>" required>
+                </label>
+                <label class="field">
+                    <span class="field__label">Correo de contacto</span>
+                    <input class="field__input" type="email" name="correo_contacto"
+                           value="<?= $view->e((string) ($cliente['correo_contacto'] ?? '')) ?>">
+                </label>
+            </div>
+            <div class="field-row">
+                <label class="field">
+                    <span class="field__label">Contacto principal</span>
+                    <input class="field__input" type="text" name="contacto_principal"
+                           value="<?= $view->e((string) ($cliente['contacto_principal'] ?? '')) ?>">
+                </label>
+                <label class="field">
+                    <span class="field__label">Teléfono</span>
+                    <input class="field__input" type="text" name="telefono"
+                           value="<?= $view->e((string) ($cliente['telefono'] ?? '')) ?>">
+                </label>
+            </div>
+            <p><button type="submit" class="btn btn--primary">Guardar datos</button></p>
+        </form>
+    </article>
+
+    <article class="card" style="margin-top:1.5rem">
+        <h2>Usuario de acceso del cliente</h2>
+        <?php if ($usuario_primario === null): ?>
+            <p class="muted">Este cliente no tiene un usuario asignado. Eliminá el cliente y créalo de nuevo desde "Nuevo cliente".</p>
+        <?php else: ?>
+            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/usuario') ?>" class="form-stack">
+                <?= $view->csrfField() ?>
+                <div class="field-row">
+                    <label class="field">
+                        <span class="field__label">Nombre del usuario *</span>
+                        <input class="field__input" type="text" name="usuario_nombre"
+                               value="<?= $view->e((string) $usuario_primario['nombre_completo']) ?>" required>
+                    </label>
+                    <label class="field">
+                        <span class="field__label">Correo (usuario para login) *</span>
+                        <input class="field__input" type="email" name="usuario_correo"
+                               value="<?= $view->e((string) $usuario_primario['correo']) ?>" required>
+                    </label>
+                </div>
+                <p><button type="submit" class="btn btn--primary">Guardar usuario</button></p>
+            </form>
+
+            <hr style="margin:1.5rem 0;border:none;border-top:1px solid var(--color-border)">
+
+            <h3 style="margin-top:0">Cambiar contraseña</h3>
+            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/password') ?>" class="form-stack" autocomplete="off">
+                <?= $view->csrfField() ?>
+                <div class="field-row">
+                    <label class="field">
+                        <span class="field__label">Nueva contraseña *</span>
+                        <input class="field__input" type="password" name="password_nueva" required
+                               autocomplete="new-password" minlength="12">
+                    </label>
+                    <label class="field">
+                        <span class="field__label">Confirmar contraseña *</span>
+                        <input class="field__input" type="password" name="password_confirm" required
+                               autocomplete="new-password" minlength="12">
+                    </label>
+                </div>
+                <p class="muted" style="font-size:0.85rem;margin:0">
+                    Mínimo 12 caracteres con mayúscula, minúscula, número y símbolo.
+                </p>
+                <p><button type="submit" class="btn btn--primary">Actualizar contraseña</button></p>
+            </form>
+        <?php endif; ?>
+    </article>
+
+    <article class="card" style="margin-top:1.5rem">
         <h2>Campañas asignadas (<?= count($campanias_asignadas) ?>)</h2>
         <?php if ($campanias_asignadas === []): ?>
             <p class="muted">Aún no le asignaste ninguna campaña a este cliente. Elegí abajo cuáles podrá ver.</p>

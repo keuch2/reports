@@ -62,6 +62,58 @@ final class ClienteRepository
         return $this->db->lastInsertId();
     }
 
+    public function actualizar(
+        int $id,
+        string $nombreComercial,
+        ?string $correoContacto,
+        ?string $contactoPrincipal,
+        ?string $telefono,
+    ): void {
+        $this->db->execute(
+            'UPDATE clientes SET nombre_comercial = :n, correo_contacto = :c,
+                                  contacto_principal = :cp, telefono = :t
+              WHERE id = :id',
+            ['id' => $id, 'n' => $nombreComercial, 'c' => $correoContacto,
+             'cp' => $contactoPrincipal, 't' => $telefono]
+        );
+    }
+
+    /**
+     * Primer usuario rol=cliente asignado a un cliente (típicamente el único).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function buscarUsuarioPrimario(int $clienteId): ?array
+    {
+        return $this->db->selectOne(
+            'SELECT id, correo, nombre_completo, activo
+               FROM usuarios
+              WHERE cliente_id = :cid AND rol = \'cliente\'
+              ORDER BY id ASC LIMIT 1',
+            ['cid' => $clienteId]
+        );
+    }
+
+    public function actualizarUsuarioPrimario(int $clienteId, string $correo, string $nombre): void
+    {
+        $this->db->execute(
+            'UPDATE usuarios SET correo = :c, nombre_completo = :n
+              WHERE cliente_id = :cid AND rol = \'cliente\'
+              ORDER BY id ASC LIMIT 1',
+            ['cid' => $clienteId, 'c' => $correo, 'n' => $nombre]
+        );
+    }
+
+    public function actualizarPasswordUsuarioPrimario(int $clienteId, string $passwordHash): void
+    {
+        $this->db->execute(
+            'UPDATE usuarios SET password_hash = :h
+              WHERE cliente_id = :cid AND rol = \'cliente\'
+              ORDER BY id ASC LIMIT 1',
+            ['cid' => $clienteId, 'h' => $passwordHash]
+        );
+    }
+
     /**
      * Campañas asignadas a un cliente con su cuenta y moneda.
      *

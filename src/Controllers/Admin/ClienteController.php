@@ -13,6 +13,7 @@ use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\ClienteRepository;
 use MisterCo\Reports\Repositories\CuentaPublicitariaRepository;
 use MisterCo\Reports\Repositories\EntidadesMetaRepository;
+use MisterCo\Reports\Repositories\UsuarioRepository;
 use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\PasswordPolicyService;
 
@@ -120,6 +121,7 @@ final class ClienteController
             'usuario' => $request->attributes['usuario'],
             'titulo' => 'Cliente · ' . $cliente['nombre_comercial'],
             'cliente' => $cliente,
+            'usuario_primario' => $repo->buscarUsuarioPrimario($id),
             'campanias_asignadas' => $repo->campaniasAsignadas($id),
             'ids_asignadas' => $repo->idsCampaniasAsignadas($id),
             'cuentas_con_campanias' => $cuentasConCampanias,
@@ -159,6 +161,141 @@ final class ClienteController
 
         $session->flash('success', count($ids) . ' campaña(s) asignada(s) al cliente.');
 
+        return Response::redirect('/admin/clientes/' . $clienteId);
+    }
+
+    /**
+     * Edita los datos comerciales del cliente (nombre, contacto, teléfono, correo).
+     */
+    public function actualizarDatos(Request $request): Response
+    {
+        /** @var Usuario $admin */
+        $admin = $request->attributes['usuario'];
+        $clienteId = (int) ($request->attributes['id'] ?? 0);
+        $session = $this->container->get(Session::class);
+        $repo = $this->container->get(ClienteRepository::class);
+
+        $cliente = $repo->buscarPorId($clienteId);
+        if ($cliente === null) {
+            return Response::redirect('/admin/clientes');
+        }
+
+        $nombre = trim((string) $request->input('nombre_comercial', ''));
+        $correo = trim((string) $request->input('correo_contacto', ''));
+        $contacto = trim((string) $request->input('contacto_principal', ''));
+        $telefono = trim((string) $request->input('telefono', ''));
+
+        if ($nombre === '') {
+            $session->flash('error', 'El nombre comercial es obligatorio.');
+            return Response::redirect('/admin/clientes/' . $clienteId);
+        }
+
+        $repo->actualizar(
+            $clienteId,
+            $nombre,
+            $correo !== '' ? $correo : null,
+            $contacto !== '' ? $contacto : null,
+            $telefono !== '' ? $telefono : null,
+        );
+
+        $this->container->get(AuditService::class)->registrar(
+            'cliente.actualizado', $admin, $request->ip, $request->userAgent,
+            'cliente', (string) $clienteId,
+            ['nombre' => $nombre, 'correo' => $correo, 'telefono' => $telefono]
+        );
+
+        $session->flash('success', 'Datos del cliente actualizados.');
+        return Response::redirect('/admin/clientes/' . $clienteId);
+    }
+
+    /**
+     * Edita el correo y nombre del usuario primario del cliente.
+     */
+    public function actualizarUsuario(Request $request): Response
+    {
+        /** @var Usuario $admin */
+        $admin = $request->attributes['usuario'];
+        $clienteId = (int) ($request->attributes['id'] ?? 0);
+        $session = $this->container->get(Session::class);
+        $repo = $this->container->get(ClienteRepository::class);
+
+        if ($repo->buscarPorId($clienteId) === null) {
+            return Response::redirect('/admin/clientes');
+        }
+        $usuario = $repo->buscarUsuarioPrimario($clienteId);
+        if ($usuario === null) {
+            $session->flash('error', 'El cliente no tiene un usuario asignado.');
+            return Response::redirect('/admin/clientes/' . $clienteId);
+        }
+
+        $correo = trim((string) $request->input('usuario_correo', ''));
+        $nombre = trim((string) $request->input('usuario_nombre', ''));
+
+        if ($correo === '' || $nombre === '') {
+            $session->flash('error', 'Correo y nombre del usuario son obligatorios.');
+            return Response::redirect('/admin/clientes/' . $clienteId);
+        }
+        if (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+            $session->flash('error', 'El correo del usuario no es válido.');
+            return Response::redirect('/admin/clientes/' . $clienteId);
+        }
+        $usuariosRepo = $this->container->get(UsuarioRepository::class);
+        if ($usuariosRepo->correoExiste($correo, (int) $usuario['id'])) {
+            $session->flash('error', 'Ya existe otro usuario con ese correo.');
+            return Response::redirect('/admin/clientes/' . $clienteId);
+        }
+
+        $repo->actualizarUsuarioPrimario($clienteId, $correo, $nombre);
+
+        $this->container->get(AuditService::class)->registrar(
+            'cliente.usuario_actualizado', $admin, $request->ip, $request->userAgent,
+            'usuario', (string) $usuario['id'],
+            ['cliente_id' => $clienteId, 'correo_nuevo' => $correo]
+        );
+
+        $session->flash('success', 'Usuario del cliente actualizado.');
+        return Response::redirect('/admin/clientes/' . $clienteId);
+    }
+
+    /**
+     * Cambia la contraseña del usuario primario del cliente.
+     */
+    public function cambiarPassword(Request $request): Response
+    {
+        /** @var Usuario $admin */
+        $admin = $request->attributes['usuario'];
+        $clienteId = (int) ($request->attributes['id'] ?? 0);
+        $session = $this->container->get(Session::class);
+        $repo = $this->container->get(ClienteRepository::class);
+
+        $usuario = $repo->buscarUsuarioPrimario($clienteId);
+        if ($usuario === null) {
+            $session->flash('error', 'El cliente no tiene un usuario asignado.');
+            return Response::redirect('/admin/clientes/' . $clienteId);
+        }
+
+        $nueva = (string) $request->input('password_nueva', '');
+        $confirm = (string) $request->input('password_confirm', '');
+
+        if ($nueva !== $confirm) {
+            $session->flash('error', 'Las contraseñas no coinciden.');
+            return Response::redirect('/admin/clientes/' . $clienteId);
+        }
+        $errores = $this->container->get(PasswordPolicyService::class)->validar($nueva);
+        if ($errores !== []) {
+            $session->flash('error', 'Contraseña inválida: ' . implode(' ', $errores));
+            return Response::redirect('/admin/clientes/' . $clienteId);
+        }
+
+        $hash = password_hash($nueva, PASSWORD_ARGON2ID, ['memory_cost' => 65536, 'time_cost' => 4, 'threads' => 1]);
+        $repo->actualizarPasswordUsuarioPrimario($clienteId, $hash);
+
+        $this->container->get(AuditService::class)->registrar(
+            'cliente.password_cambiado', $admin, $request->ip, $request->userAgent,
+            'usuario', (string) $usuario['id'], ['cliente_id' => $clienteId]
+        );
+
+        $session->flash('success', 'Contraseña del cliente actualizada.');
         return Response::redirect('/admin/clientes/' . $clienteId);
     }
 }
