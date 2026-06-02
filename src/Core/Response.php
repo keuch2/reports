@@ -85,7 +85,7 @@ final class Response
             . "style-src 'self' 'unsafe-inline'; "
             . "img-src 'self' data: https://api.qrserver.com https://*.fbcdn.net https://*.cdninstagram.com; "
             . "font-src 'self' data:; "
-            . "connect-src 'self'; "
+            . "connect-src 'self' https://cdn.jsdelivr.net; "
             . "frame-ancestors 'none'; "
             . "base-uri 'self'; "
             . "form-action 'self'";
