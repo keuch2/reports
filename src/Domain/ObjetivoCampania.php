@@ -16,9 +16,9 @@ namespace MisterCo\Reports\Domain;
  */
 final class ObjetivoCampania
 {
-    /** @var array<string, string> objective Meta → etiqueta humana del "Resultado" */
+    /** @var array<string, string> objective/optimization_goal Meta → etiqueta humana del "Resultado" */
     private const ETIQUETAS = [
-        // ODAX (Outcome-Driven Ads Experiences, 2022+)
+        // ODAX (Outcome-Driven Ads Experiences, 2022+) — `objective` de campaña
         'OUTCOME_AWARENESS' => 'Personas alcanzadas',
         'OUTCOME_TRAFFIC' => 'Visitas a destino',
         'OUTCOME_ENGAGEMENT' => 'Interacciones',
@@ -26,7 +26,7 @@ final class ObjetivoCampania
         'OUTCOME_APP_PROMOTION' => 'Instalaciones',
         'OUTCOME_SALES' => 'Compras',
 
-        // Objetivos legacy (pre-ODAX)
+        // Objetivos legacy (pre-ODAX) — `objective` de campaña
         'BRAND_AWARENESS' => 'Personas alcanzadas',
         'REACH' => 'Personas alcanzadas',
         'LINK_CLICKS' => 'Clicks al enlace',
@@ -41,6 +41,20 @@ final class ObjetivoCampania
         'STORE_VISITS' => 'Visitas a la tienda',
         'APP_INSTALLS' => 'Instalaciones de la app',
         'PRODUCT_CATALOG_SALES' => 'Compras del catálogo',
+
+        // optimization_goal del adset (sobrescribe al objective cuando difiere).
+        // Bajo una campaña OUTCOME_LEADS el cliente puede tener adsets que optimizan
+        // CONVERSATIONS (mensajes WA) o LEAD_GENERATION (formularios) — la métrica
+        // mostrada debe coincidir con lo que el adset realmente optimiza.
+        'CONVERSATIONS' => 'Conversaciones iniciadas',
+        'OFFSITE_CONVERSIONS' => 'Conversiones',
+        'QUALITY_LEAD' => 'Clientes potenciales',
+        'LEAD' => 'Clientes potenciales',
+        'IMPRESSIONS' => 'Impresiones',
+        'THRUPLAY' => 'Reproducciones de video',
+        'LANDING_PAGE_VIEWS' => 'Visitas a destino',
+        'POST_ENGAGEMENT' => 'Interacciones',
+        'REPLIES' => 'Conversaciones iniciadas',
     ];
 
     /**

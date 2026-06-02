@@ -265,12 +265,16 @@ final class DashboardService
                 COALESCE(SUM(ms.conversaciones), 0) AS conversaciones,
                 COALESCE(SUM(ms.landing_page_views), 0) AS landing_page_views,
                 COALESCE(SUM(ms.leads), 0) AS leads,
-                -- 'resultados' del importer puede venir 0 si Meta no devolvió el campo.
-                -- Caemos a leads/conversaciones según el objetivo de la campaña.
+                -- Resultados: prioridad al optimization_goal del adset (es lo que
+                -- realmente se está optimizando). Si no aplica, cae al objetivo de
+                -- la campaña. Como último recurso usa el campo `results` de Meta.
                 CASE
-                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.resultados)
+                    WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') THEN SUM(ms.conversaciones)
+                    WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') THEN SUM(ms.leads)
+                    WHEN cs.optimization_goal = 'LANDING_PAGE_VIEWS' THEN SUM(ms.landing_page_views)
                     WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN SUM(ms.leads)
                     WHEN c.objetivo IN ('MESSAGES','OUTCOME_ENGAGEMENT') THEN SUM(ms.conversaciones)
+                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.resultados)
                     ELSE 0
                 END AS resultados,
                 CASE WHEN SUM(ms.impresiones) > 0
@@ -280,11 +284,17 @@ final class DashboardService
                      THEN SUM(ms.gasto) / SUM(ms.clicks_totales)
                      ELSE NULL END AS cpc,
                 CASE
-                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.gasto) / SUM(ms.resultados)
+                    WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') AND SUM(ms.conversaciones) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.conversaciones)
+                    WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') AND SUM(ms.leads) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.leads)
+                    WHEN cs.optimization_goal = 'LANDING_PAGE_VIEWS' AND SUM(ms.landing_page_views) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.landing_page_views)
                     WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') AND SUM(ms.leads) > 0
                         THEN SUM(ms.gasto) / SUM(ms.leads)
                     WHEN c.objetivo IN ('MESSAGES','OUTCOME_ENGAGEMENT') AND SUM(ms.conversaciones) > 0
                         THEN SUM(ms.gasto) / SUM(ms.conversaciones)
+                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.gasto) / SUM(ms.resultados)
                     ELSE NULL
                 END AS costo_por_resultado,
                 CASE WHEN SUM(ms.conversaciones) > 0
@@ -323,7 +333,7 @@ final class DashboardService
             "SELECT
                 a.id, a.nombre, a.tipo, a.thumbnail_url, a.image_url,
                 a.cuerpo, a.titulo, a.link_url, a.call_to_action, a.permalink_url, a.estado,
-                cs.id AS adset_id, cs.nombre AS adset_nombre,
+                cs.id AS adset_id, cs.nombre AS adset_nombre, cs.optimization_goal,
                 c.objetivo AS objetivo_campania,
                 COALESCE(SUM(ms.gasto), 0) AS gasto,
                 COALESCE(SUM(ms.impresiones), 0) AS impresiones,
@@ -333,9 +343,12 @@ final class DashboardService
                 COALESCE(SUM(ms.landing_page_views), 0) AS landing_page_views,
                 COALESCE(SUM(ms.leads), 0) AS leads,
                 CASE
-                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.resultados)
+                    WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') THEN SUM(ms.conversaciones)
+                    WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') THEN SUM(ms.leads)
+                    WHEN cs.optimization_goal = 'LANDING_PAGE_VIEWS' THEN SUM(ms.landing_page_views)
                     WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN SUM(ms.leads)
                     WHEN c.objetivo IN ('MESSAGES','OUTCOME_ENGAGEMENT') THEN SUM(ms.conversaciones)
+                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.resultados)
                     ELSE 0
                 END AS resultados,
                 CASE WHEN SUM(ms.impresiones) > 0
@@ -345,11 +358,17 @@ final class DashboardService
                      THEN SUM(ms.gasto) / SUM(ms.clicks_totales)
                      ELSE NULL END AS cpc,
                 CASE
-                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.gasto) / SUM(ms.resultados)
+                    WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') AND SUM(ms.conversaciones) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.conversaciones)
+                    WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') AND SUM(ms.leads) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.leads)
+                    WHEN cs.optimization_goal = 'LANDING_PAGE_VIEWS' AND SUM(ms.landing_page_views) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.landing_page_views)
                     WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') AND SUM(ms.leads) > 0
                         THEN SUM(ms.gasto) / SUM(ms.leads)
                     WHEN c.objetivo IN ('MESSAGES','OUTCOME_ENGAGEMENT') AND SUM(ms.conversaciones) > 0
                         THEN SUM(ms.gasto) / SUM(ms.conversaciones)
+                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.gasto) / SUM(ms.resultados)
                     ELSE NULL
                 END AS costo_por_resultado,
                 CASE WHEN SUM(ms.conversaciones) > 0
@@ -364,7 +383,7 @@ final class DashboardService
                {$exclAnunciosSql}
           GROUP BY a.id, a.nombre, a.tipo, a.thumbnail_url, a.image_url,
                    a.cuerpo, a.titulo, a.link_url, a.call_to_action, a.permalink_url, a.estado,
-                   cs.id, cs.nombre, c.objetivo
+                   cs.id, cs.nombre, cs.optimization_goal, c.objetivo
           ORDER BY gasto DESC",
             $params
         );

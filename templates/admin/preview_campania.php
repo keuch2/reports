@@ -105,8 +105,11 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                 </thead>
                 <tbody>
                 <?php foreach ($adsets as $g):
-                    $objAdset = (string) ($g['objetivo_campania'] ?? $objetivo);
-                    $labelCorto = ObjetivoCampania::nombreCortoResultados($objAdset);
+                    // optimization_goal del adset gana sobre el objective de la campaña:
+                    // es lo que realmente se está optimizando (p. ej. CONVERSATIONS bajo
+                    // una campaña OUTCOME_LEADS).
+                    $objAdset = $g['optimization_goal'] ?: ($g['objetivo_campania'] ?? $objetivo);
+                    $labelCorto = ObjetivoCampania::nombreCortoResultados((string) $objAdset);
                 ?>
                     <tr>
                         <td><strong><?= $view->e((string) $g['adset_nombre']) ?></strong>

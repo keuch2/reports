@@ -11,16 +11,16 @@
 
 use MisterCo\Reports\Domain\ObjetivoCampania;
 
-// Mostramos una sola "métrica de resultado" según el objetivo de la campaña padre,
-// para no duplicar (ej. en OUTCOME_LEADS no tiene sentido mostrar conversaciones).
-$objetivoAd = strtoupper((string) ($a['objetivo_campania'] ?? ''));
-$esLeads = in_array($objetivoAd, ['OUTCOME_LEADS', 'LEAD_GENERATION'], true);
-$esMensajes = in_array($objetivoAd, ['MESSAGES', 'OUTCOME_ENGAGEMENT'], true);
+// Mostramos una sola "métrica de resultado" según el objetivo real del adset
+// (optimization_goal) o, si no está, el objetivo de la campaña. Evita duplicar
+// (ej. adset CONVERSATIONS bajo campaña OUTCOME_LEADS → solo conversaciones).
+$optGoal = strtoupper((string) ($a['optimization_goal'] ?? ''));
+$objetivoCam = strtoupper((string) ($a['objetivo_campania'] ?? ''));
+$esLeads = in_array($optGoal, ['LEAD_GENERATION', 'QUALITY_LEAD', 'LEAD'], true)
+    || ($optGoal === '' && in_array($objetivoCam, ['OUTCOME_LEADS', 'LEAD_GENERATION'], true));
+$esMensajes = in_array($optGoal, ['CONVERSATIONS', 'REPLIES'], true)
+    || ($optGoal === '' && in_array($objetivoCam, ['MESSAGES', 'OUTCOME_ENGAGEMENT'], true));
 
-// Reglas:
-// - Si la campaña optimiza por LEADS → ocultar conversaciones (no relevantes).
-// - Si optimiza por MENSAJES → ocultar leads (no relevantes).
-// - Si no es ninguno (tráfico, awareness, etc.) → respetamos el flag de la campaña.
 $mostrarConversaciones = !$esLeads && !($ocultarConversaciones ?? false);
 $mostrarLeads = !$esMensajes && !($ocultarLeads ?? false);
 
@@ -39,7 +39,11 @@ $tipoLabel = match ($tipo) {
     default => 'Anuncio',
 };
 
-$labelCortoLower = mb_strtolower($labelResultadosCorto ?? 'resultado');
+// Etiqueta de "Resultados" según el optimization_goal del adset (más específico
+// que el objective de la campaña, que el partial recibe como labelResultadosCorto).
+$labelAdset = $optGoal !== '' ? ObjetivoCampania::nombreCortoResultados($optGoal)
+    : ($labelResultadosCorto ?? 'Resultados');
+$labelCortoLower = mb_strtolower($labelAdset);
 ?>
 <article class="ad-card">
     <div class="ad-card__media">
@@ -64,12 +68,25 @@ $labelCortoLower = mb_strtolower($labelResultadosCorto ?? 'resultado');
             <p class="ad-card__copy"><?= nl2br($view->e(mb_strlen($cuerpo) > 320 ? mb_substr($cuerpo, 0, 320) . '…' : $cuerpo)) ?></p>
         <?php endif; ?>
 
-        <?php if ($linkUrl !== '' || $permalink !== ''): ?>
+        <?php
+        // Ocultamos el link cuando es un deep-link de WhatsApp/Messenger (no
+        // tiene destino visitable desde un browser) o cuando el CTA lo confirma.
+        $linkEsMensaje = $linkUrl !== '' && (
+            stripos($cta, 'WHATSAPP') !== false
+            || stripos($cta, 'MESSAGE_PAGE') !== false
+            || stripos($linkUrl, 'wa.me') !== false
+            || stripos($linkUrl, 'whatsapp.com') !== false
+            || stripos($linkUrl, 'applinks://') === 0
+            || stripos($linkUrl, 'm.me/') !== false
+        );
+        $mostrarLink = $linkUrl !== '' && !$linkEsMensaje;
+        ?>
+        <?php if ($mostrarLink || $permalink !== ''): ?>
             <p class="ad-card__links">
                 <?php if ($permalink !== ''): ?>
                     <a href="<?= $view->e($permalink) ?>" target="_blank" rel="noopener noreferrer">Ver post original ↗</a>
                 <?php endif; ?>
-                <?php if ($linkUrl !== ''): ?>
+                <?php if ($mostrarLink): ?>
                     <a href="<?= $view->e($linkUrl) ?>" target="_blank" rel="noopener noreferrer">
                         <?= $cta !== '' ? $view->e(ucfirst(str_replace('_', ' ', strtolower($cta)))) : 'Link de destino' ?> ↗
                     </a>
@@ -93,7 +110,7 @@ $labelCortoLower = mb_strtolower($labelResultadosCorto ?? 'resultado');
                 </tr>
                 <?php if (((int) ($a['resultados'] ?? 0)) > 0): ?>
                     <tr>
-                        <th><?= $view->e($labelResultadosCorto ?? 'Resultados') ?></th>
+                        <th><?= $view->e($labelAdset) ?></th>
                         <td><?= $fmtNum($a['resultados']) ?></td>
                         <?php if (isset($a['costo_por_resultado']) && $a['costo_por_resultado'] !== null): ?>
                             <th>Costo p/<?= $view->e($labelCortoLower) ?></th>
