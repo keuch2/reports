@@ -26,7 +26,7 @@ final class ImportacionService
      * y guardamos el raw en metricas_extendidas para futuras métricas.
      */
     private const INSIGHTS_FIELDS = [
-        'date_start', 'date_stop', 'ad_id', 'spend', 'impressions', 'reach', 'frequency',
+        'date_start', 'date_stop', 'ad_id', 'campaign_id', 'spend', 'impressions', 'reach', 'frequency',
         'clicks', 'inline_link_clicks', 'ctr', 'cpc', 'cpm',
         'cost_per_result', 'results', 'conversions',
         'actions', 'cost_per_action_type',
@@ -141,13 +141,16 @@ final class ImportacionService
                     'value' => array_keys($filtroSet),
                 ]]);
             }
+            $objetivoPorCampania = [];
             foreach ($cliente->paginar("act_{$metaAccountId}/campaigns", $campaniasQuery) as $c) {
                 $llamadas++;
+                $objetivo = isset($c['objective']) ? (string) $c['objective'] : null;
+                $objetivoPorCampania[(string) $c['id']] = $objetivo;
                 $this->entidadesRepo->upsertCampania(
                     metaCampaignId: (string) $c['id'],
                     cuentaPublicitariaId: $cuentaId,
                     nombre: (string) ($c['name'] ?? 'Sin nombre'),
-                    objetivo: isset($c['objective']) ? (string) $c['objective'] : null,
+                    objetivo: $objetivo,
                     estado: isset($c['status']) ? (string) $c['status'] : null,
                     fechaInicio: $this->fechaSolo($c['start_time'] ?? null),
                     fechaFin: $this->fechaSolo($c['stop_time'] ?? null),
@@ -328,6 +331,16 @@ final class ImportacionService
                 $leads = $this->sumarActions($actions, self::ACTION_TYPES['leads']);
                 $costoPorConv = $this->primerCostoPorAction($costPerAction, self::COST_ACTION_TYPES_CONVERSACION);
 
+                // Resultados: Meta no siempre devuelve el campo `results` (depende del setup
+                // de la campaña). Fallback al action_type que corresponde al objetivo.
+                $resultadosBruto = isset($i['results'][0]['values'][0]['value'])
+                    ? (int) $i['results'][0]['values'][0]['value']
+                    : null;
+                if ($resultadosBruto === null || $resultadosBruto === 0) {
+                    $objCampania = $objetivoPorCampania[(string) ($i['campaign_id'] ?? '')] ?? null;
+                    $resultadosBruto = $this->resultadosSegunObjetivo($objCampania, $leads, $conversaciones, $landingViews);
+                }
+
                 // Guardamos los arrays raw en metricas_extendidas para no perder nada.
                 $extendidas = ['actions' => $actions, 'cost_per_action_type' => $costPerAction];
 
@@ -348,9 +361,7 @@ final class ImportacionService
                     costoPorResultado: isset($i['cost_per_result'][0]['values'][0]['value'])
                         ? (float) $i['cost_per_result'][0]['values'][0]['value']
                         : null,
-                    resultados: isset($i['results'][0]['values'][0]['value'])
-                        ? (int) $i['results'][0]['values'][0]['value']
-                        : null,
+                    resultados: $resultadosBruto,
                     conversiones: isset($i['conversions'][0]['value'])
                         ? (int) $i['conversions'][0]['value']
                         : null,
@@ -409,6 +420,21 @@ final class ImportacionService
         }
 
         return $encontrado ? $total : null;
+    }
+
+    /**
+     * Devuelve la métrica de "resultados" apropiada según el objetivo de la campaña.
+     * Replica la lógica de la columna "Resultados" de Meta Ads Manager.
+     */
+    private function resultadosSegunObjetivo(?string $objetivo, ?int $leads, ?int $conversaciones, ?int $landingViews): ?int
+    {
+        $obj = strtoupper((string) $objetivo);
+        return match ($obj) {
+            'OUTCOME_LEADS', 'LEAD_GENERATION' => $leads,
+            'MESSAGES', 'OUTCOME_ENGAGEMENT' => $conversaciones,
+            'OUTCOME_TRAFFIC', 'LINK_CLICKS' => $landingViews,
+            default => null,
+        };
     }
 
     /**

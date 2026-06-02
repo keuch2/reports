@@ -92,19 +92,15 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                         <th class="num">Clicks</th>
                         <th class="num">CTR</th>
                         <th class="num">CPC</th>
-                        <th class="num"><?= $view->e($labelResultadosCorto) ?></th>
-                        <th class="num">Costo p/<?= $view->e(mb_strtolower($labelResultadosCorto)) ?></th>
-                        <?php if (!$ocultarConversaciones): ?>
-                            <th class="num">Conversac.</th>
-                        <?php endif; ?>
-                        <?php if (!$ocultarLeads): ?>
-                            <th class="num">Leads</th>
-                        <?php endif; ?>
-                        <th class="num">Visitas pág.</th>
+                        <th class="num">Resultados</th>
+                        <th class="num">Costo p/resultado</th>
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($adsets as $g): ?>
+                <?php foreach ($adsets as $g):
+                    $objAdset = (string) ($g['objetivo_campania'] ?? $objetivo);
+                    $labelCorto = ObjetivoCampania::nombreCortoResultados($objAdset);
+                ?>
                     <tr>
                         <td><strong><?= $view->e((string) $g['adset_nombre']) ?></strong>
                             <?php if ($g['optimization_goal']): ?>
@@ -117,15 +113,17 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                         <td class="num"><?= $fmtNum($g['clicks']) ?></td>
                         <td class="num"><?= $fmtPct($g['ctr']) ?></td>
                         <td class="num"><?= $g['cpc'] !== null ? $fmtMoneda($g['cpc']) : '—' ?></td>
-                        <td class="num"><?= ((int) ($g['resultados'] ?? 0)) > 0 ? $fmtNum($g['resultados']) : '—' ?></td>
-                        <td class="num"><?= isset($g['costo_por_resultado']) && $g['costo_por_resultado'] !== null ? $fmtMoneda($g['costo_por_resultado']) : '—' ?></td>
-                        <?php if (!$ocultarConversaciones): ?>
-                            <td class="num"><?= ((int) ($g['conversaciones'] ?? 0)) > 0 ? $fmtNum($g['conversaciones']) : '—' ?></td>
-                        <?php endif; ?>
-                        <?php if (!$ocultarLeads): ?>
-                            <td class="num"><?= ((int) ($g['leads'] ?? 0)) > 0 ? $fmtNum($g['leads']) : '—' ?></td>
-                        <?php endif; ?>
-                        <td class="num"><?= ((int) ($g['landing_page_views'] ?? 0)) > 0 ? $fmtNum($g['landing_page_views']) : '—' ?></td>
+                        <td class="num">
+                            <?php if (((int) ($g['resultados'] ?? 0)) > 0): ?>
+                                <?= $fmtNum($g['resultados']) ?>
+                                <br><small class="muted"><?= $view->e(mb_strtolower($labelCorto)) ?></small>
+                            <?php else: ?>—<?php endif; ?>
+                        </td>
+                        <td class="num">
+                            <?php if (isset($g['costo_por_resultado']) && $g['costo_por_resultado'] !== null): ?>
+                                <?= $view->e($mon) ?> <?= $fmtMoneda($g['costo_por_resultado']) ?>
+                            <?php else: ?>—<?php endif; ?>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
