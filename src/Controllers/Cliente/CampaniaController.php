@@ -39,9 +39,15 @@ final class CampaniaController
             return Response::html('<h1>403 — Sin acceso a esta campaña.</h1>', 403);
         }
 
-        [$desde, $hasta, $preset] = $this->resolverRango(
-            (string) $request->input('preset', 'ultimos_30_dias'),
-        );
+        $mesesDisponibles = $entidades->mesesConDatosDeCampania($campaniaId);
+        $mesSeleccionado = $this->resolverMes((string) $request->input('mes', ''), $mesesDisponibles);
+        if ($mesSeleccionado === null) {
+            // Campaña sin snapshots — devuelve detalle vacío pero válido.
+            $desde = date('Y-m-01');
+            $hasta = date('Y-m-t');
+        } else {
+            [$desde, $hasta] = $this->rangoDelMes($mesSeleccionado);
+        }
 
         $totales = $dashboard->totalesCampania($clienteId, $campaniaId, $desde, $hasta);
         $adsets = $dashboard->adsetsDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta);
@@ -82,26 +88,34 @@ final class CampaniaController
             'anuncios_por_adset' => $anunciosPorAdset,
             'desde' => $desde,
             'hasta' => $hasta,
-            'preset' => $preset,
+            'mes_seleccionado' => $mesSeleccionado,
+            'meses_disponibles' => $mesesDisponibles,
             'analisis' => $analisis,
             'evolucion' => $evolucion,
         ]));
     }
 
-    /** @return array{0:string,1:string,2:string} */
-    private function resolverRango(string $preset): array
+    /**
+     * Si el mes pedido (YYYY-MM) está en la lista de disponibles lo usa.
+     * Si no, devuelve el más reciente, o null si no hay datos.
+     *
+     * @param list<string> $disponibles
+     */
+    private function resolverMes(string $mes, array $disponibles): ?string
     {
-        $hoy = date('Y-m-d');
-        $presets = [
-            'hoy' => [$hoy, $hoy],
-            'ayer' => [date('Y-m-d', strtotime('-1 day')), date('Y-m-d', strtotime('-1 day'))],
-            'ultimos_7_dias' => [date('Y-m-d', strtotime('-7 days')), $hoy],
-            'ultimos_30_dias' => [date('Y-m-d', strtotime('-30 days')), $hoy],
-            'mes_actual' => [date('Y-m-01'), $hoy],
-            'mes_pasado' => [date('Y-m-01', strtotime('first day of last month')), date('Y-m-t', strtotime('last day of last month'))],
-        ];
-        $r = $presets[$preset] ?? $presets['ultimos_30_dias'];
+        if ($disponibles === []) {
+            return null;
+        }
+        if ($mes !== '' && in_array($mes, $disponibles, true)) {
+            return $mes;
+        }
+        return $disponibles[0];
+    }
 
-        return [$r[0], $r[1], array_key_exists($preset, $presets) ? $preset : 'ultimos_30_dias'];
+    /** @return array{0:string,1:string} */
+    private function rangoDelMes(string $yyyymm): array
+    {
+        $ts = strtotime($yyyymm . '-01');
+        return [date('Y-m-01', $ts), date('Y-m-t', $ts)];
     }
 }

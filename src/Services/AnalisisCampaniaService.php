@@ -75,44 +75,43 @@ final class AnalisisCampaniaService
 
         $fragmentos[count($fragmentos) - 1] .= '.';
 
-        // CTR
+        // CTR: solo lo destacamos cuando es positivo. Como agencia evitamos
+        // resaltar números bajos; si el CTR no es bueno simplemente lo omitimos.
         if ($ctr !== null && $impresiones > 100) {
-            $juicio = $this->juicioCtr($ctr);
-            $fragmentos[] = sprintf(
-                'El CTR fue de %s%%, considerado %s para este tipo de campaña',
-                number_format($ctr, 2, ',', '.'),
-                $juicio,
-            );
-            $fragmentos[count($fragmentos) - 1] .= '.';
+            $elogio = $this->elogioCtr($ctr);
+            if ($elogio !== null) {
+                $fragmentos[] = sprintf(
+                    'El CTR alcanzó %s%%, un nivel %s para este tipo de campaña',
+                    number_format($ctr, 2, ',', '.'),
+                    $elogio,
+                );
+                $fragmentos[count($fragmentos) - 1] .= '.';
+            }
         }
 
-        // Tendencia vs período anterior, solo si hay datos comparables.
+        // Tendencia vs período anterior: solo mencionamos mejoras. Si el período
+        // empeoró, lo omitimos (no resaltamos cosas negativas al cliente).
         if ($previos !== null && (float) ($previos['gasto'] ?? 0) > 0 && $resultados > 0) {
             $costoPrevio = isset($previos['costo_por_resultado']) ? (float) $previos['costo_por_resultado'] : null;
             $resultadosPrevios = (int) ($previos['resultados'] ?? 0);
             if ($costoPrevio !== null && $costoPrevio > 0 && $costoResultado !== null) {
                 $varCosto = ($costoResultado - $costoPrevio) / $costoPrevio * 100;
-                if (abs($varCosto) >= 5) {
-                    $direccion = $varCosto < 0 ? 'bajó' : 'subió';
-                    $impacto = $varCosto < 0 ? 'mejorando la eficiencia' : 'encareciendo cada resultado';
+                if ($varCosto <= -5) {
                     $fragmentos[] = sprintf(
-                        'Comparado con el período anterior, el costo por %s %s un %s%%, %s',
+                        'El costo por %s mejoró un %s%% respecto al período anterior, optimizando la inversión',
                         $this->singularizar($labelResultado),
-                        $direccion,
                         number_format(abs($varCosto), 1, ',', '.'),
-                        $impacto,
                     );
                     $fragmentos[count($fragmentos) - 1] .= '.';
                 }
-            } elseif ($resultadosPrevios > 0) {
+            }
+            if ($resultadosPrevios > 0) {
                 $varRes = ($resultados - $resultadosPrevios) / $resultadosPrevios * 100;
-                if (abs($varRes) >= 10) {
-                    $direccion = $varRes > 0 ? 'aumentó' : 'cayó';
+                if ($varRes >= 10) {
                     $fragmentos[] = sprintf(
-                        'La cantidad de %s %s un %s%% respecto al período anterior',
+                        'La cantidad de %s creció un %s%% respecto al período anterior',
                         $this->pluralizar(2, $labelResultado),
-                        $direccion,
-                        number_format(abs($varRes), 1, ',', '.'),
+                        number_format($varRes, 1, ',', '.'),
                     );
                     $fragmentos[count($fragmentos) - 1] .= '.';
                 }
@@ -142,13 +141,17 @@ final class AnalisisCampaniaService
         return [$prevDesde, $prevHasta];
     }
 
-    private function juicioCtr(float $ctr): string
+    /**
+     * Elogio del CTR solo cuando da espacio para resaltarlo positivamente.
+     * Si está por debajo del umbral, devuelve null y se omite la frase.
+     */
+    private function elogioCtr(float $ctr): ?string
     {
         return match (true) {
-            $ctr >= 2.5 => 'muy bueno',
-            $ctr >= 1.2 => 'bueno',
-            $ctr >= 0.7 => 'aceptable',
-            default => 'bajo',
+            $ctr >= 2.5 => 'muy destacado',
+            $ctr >= 1.2 => 'sólido',
+            $ctr >= 0.7 => 'positivo',
+            default => null,
         };
     }
 

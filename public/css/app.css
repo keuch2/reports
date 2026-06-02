@@ -330,6 +330,13 @@ a { color: var(--color-primary); }
 .table td.num, .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .table tbody tr:hover { background: #fafafa; }
 
+.table--costos { max-width: 480px; }
+.table--costos th { text-transform: none; letter-spacing: 0; color: var(--color-text); background: transparent; font-weight: 500; }
+.table--costos tbody tr:hover { background: transparent; }
+.table__subtotal th, .table__subtotal td { border-top: 1px solid var(--color-border); padding-top: 0.6rem; }
+.table__total th, .table__total td { border-top: 2px solid var(--color-text); padding-top: 0.7rem; font-size: 1.05rem; }
+.table__total th { font-weight: 600; }
+
 /* Badges */
 .badge {
     display: inline-block;

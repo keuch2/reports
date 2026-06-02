@@ -104,9 +104,16 @@ final class PreviewClienteController
             return Response::html('<h1>Esta campaña no está asignada a este cliente.</h1>', 404);
         }
 
-        [$desde, $hasta, $preset] = $this->resolverRango(
-            (string) $request->input('preset', 'ultimos_30_dias'),
-        );
+        $mesesDisponibles = $entidades->mesesConDatosDeCampania($campaniaId);
+        $mesSeleccionado = $this->resolverMes((string) $request->input('mes', ''), $mesesDisponibles);
+        if ($mesSeleccionado === null) {
+            $desde = date('Y-m-01');
+            $hasta = date('Y-m-t');
+        } else {
+            $ts = strtotime($mesSeleccionado . '-01');
+            $desde = date('Y-m-01', $ts);
+            $hasta = date('Y-m-t', $ts);
+        }
 
         $totales = $service->totalesCampania($clienteId, $campaniaId, $desde, $hasta);
         $adsets = $service->adsetsDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta);
@@ -147,10 +154,23 @@ final class PreviewClienteController
             'anuncios_por_adset' => $anunciosPorAdset,
             'desde' => $desde,
             'hasta' => $hasta,
-            'preset' => $preset,
+            'mes_seleccionado' => $mesSeleccionado,
+            'meses_disponibles' => $mesesDisponibles,
             'analisis' => $analisis,
             'evolucion' => $evolucion,
         ]));
+    }
+
+    /** @param list<string> $disponibles */
+    private function resolverMes(string $mes, array $disponibles): ?string
+    {
+        if ($disponibles === []) {
+            return null;
+        }
+        if ($mes !== '' && in_array($mes, $disponibles, true)) {
+            return $mes;
+        }
+        return $disponibles[0];
     }
 
     /** @return array{0:string,1:string,2:string} */

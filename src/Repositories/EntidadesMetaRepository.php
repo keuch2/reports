@@ -171,6 +171,26 @@ final class EntidadesMetaRepository
     }
 
     /**
+     * Lista de meses (YYYY-MM) que tienen al menos un snapshot para la campaña.
+     * Ordenado del más reciente al más viejo.
+     *
+     * @return list<string>
+     */
+    public function mesesConDatosDeCampania(int $campaniaId): array
+    {
+        $rows = $this->db->select(
+            'SELECT DISTINCT DATE_FORMAT(ms.fecha, \'%Y-%m\') AS mes
+               FROM metricas_snapshots ms
+               JOIN anuncios a ON a.id = ms.entidad_id AND ms.nivel = \'ad\'
+               JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
+              WHERE cs.campania_id = :c
+              ORDER BY mes DESC',
+            ['c' => $campaniaId]
+        );
+        return array_map(static fn ($r) => (string) $r['mes'], $rows);
+    }
+
+    /**
      * Optimization_goal más usado entre los adsets de una campaña. Permite que
      * los textos descriptivos (análisis) usen la métrica de resultado correcta
      * cuando una campaña tiene varios adsets con distintos goals.
