@@ -175,7 +175,42 @@ final class ImportacionService
                 if ($adsetIdInterno === null) {
                     continue;
                 }
-                $datosCreative = $this->extraerCreative($ad['creative'] ?? [], (string) ($ad['preview_shareable_link'] ?? ''));
+                $creativeAnidado = $ad['creative'] ?? [];
+                $datosCreative = $this->extraerCreative(is_array($creativeAnidado) ? $creativeAnidado : [], (string) ($ad['preview_shareable_link'] ?? ''));
+
+                // Fallback: si el creative anidado vino sin imagen ni copy útil pero tenemos
+                // un creative_id, vamos a buscarlo directamente.
+                // Casos comunes: ads con object_story_id (post existente), asset feed dinámico,
+                // creatives con permisos limitados.
+                if ($this->creativeIncompleto($datosCreative) && $datosCreative['creative_id'] !== null) {
+                    try {
+                        $creativeFull = $cliente->get($datosCreative['creative_id'], [
+                            'fields' => self::CREATIVE_FIELDS,
+                        ]);
+                        $llamadas++;
+                        $datosCreative = $this->extraerCreative($creativeFull, (string) ($ad['preview_shareable_link'] ?? ''));
+
+                        // Segundo fallback: si tenemos un effective_object_story_id (post de FB),
+                        // intentamos traer del post el message + full_picture + permalink.
+                        if ($this->creativeIncompleto($datosCreative)) {
+                            $storyId = (string) ($creativeFull['effective_object_story_id'] ?? '');
+                            if ($storyId !== '') {
+                                try {
+                                    $post = $cliente->get($storyId, [
+                                        'fields' => ['message', 'full_picture', 'picture', 'permalink_url', 'attachments{description,title,url}'],
+                                    ]);
+                                    $llamadas++;
+                                    $datosCreative = $this->complementarConPost($datosCreative, $post);
+                                } catch (\Throwable) {
+                                    // si el post no es accesible (page sin permisos), seguimos con lo que tenemos
+                                }
+                            }
+                        }
+                    } catch (\Throwable) {
+                        // si el creative no es accesible por permisos, dejamos lo que ya teníamos
+                    }
+                }
+
                 $this->entidadesRepo->upsertAnuncio(
                     metaAdId: (string) $ad['id'],
                     conjuntoAnunciosId: $adsetIdInterno,
@@ -372,6 +407,66 @@ final class ImportacionService
             'call_to_action' => $cta !== null ? (string) $cta : null,
             'permalink_url' => $permalinkUrl,
         ];
+    }
+
+    /**
+     * Heurística para detectar si el creative llegó sin lo mínimo visible (imagen + copy).
+     * Si está incompleto, vale la pena hacer fetch extra al creative/post.
+     *
+     * @param array<string,mixed> $c
+     */
+    private function creativeIncompleto(array $c): bool
+    {
+        $tieneVisual = !empty($c['image_url']) || !empty($c['thumbnail_url']);
+        $tieneCopy = !empty($c['cuerpo']) || !empty($c['titulo']);
+
+        return !$tieneVisual || !$tieneCopy;
+    }
+
+    /**
+     * Complementa los datos del creative con los del post original de FB cuando
+     * el creative apunta a un post existente (object_story_id) y los fields anidados
+     * vienen vacíos.
+     *
+     * @param array{creative_id:?string, tipo:?string, thumbnail_url:?string, cuerpo:?string,
+     *               titulo:?string, link_url:?string, image_url:?string,
+     *               call_to_action:?string, permalink_url:?string} $datos
+     * @param array<string,mixed> $post
+     * @return array{creative_id:?string, tipo:?string, thumbnail_url:?string, cuerpo:?string,
+     *                titulo:?string, link_url:?string, image_url:?string,
+     *                call_to_action:?string, permalink_url:?string}
+     */
+    private function complementarConPost(array $datos, array $post): array
+    {
+        if (empty($datos['cuerpo']) && !empty($post['message'])) {
+            $datos['cuerpo'] = (string) $post['message'];
+        }
+        $fullPicture = $post['full_picture'] ?? $post['picture'] ?? null;
+        if (empty($datos['image_url']) && $fullPicture !== null) {
+            $datos['image_url'] = (string) $fullPicture;
+        }
+        if (empty($datos['thumbnail_url']) && $fullPicture !== null) {
+            $datos['thumbnail_url'] = (string) $fullPicture;
+        }
+        if (empty($datos['permalink_url']) && !empty($post['permalink_url'])) {
+            $datos['permalink_url'] = (string) $post['permalink_url'];
+        }
+        // attachments suele tener title/url de un link adjunto
+        $att = $post['attachments']['data'][0] ?? null;
+        if (is_array($att)) {
+            if (empty($datos['titulo']) && !empty($att['title'])) {
+                $datos['titulo'] = (string) $att['title'];
+            }
+            if (empty($datos['link_url']) && !empty($att['url'])) {
+                $datos['link_url'] = (string) $att['url'];
+            }
+        }
+        // si llegó cualquier visual, marcamos tipo
+        if ($datos['tipo'] === null && (!empty($datos['image_url']) || !empty($datos['thumbnail_url']))) {
+            $datos['tipo'] = 'image';
+        }
+
+        return $datos;
     }
 
     private function fechaSolo(mixed $valor): ?string

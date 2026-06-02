@@ -5,6 +5,9 @@
 /** @var \Closure $fmtMoneda */
 /** @var \Closure $fmtNum */
 /** @var \Closure $fmtPct */
+/** @var string $labelResultadosCorto Nombre humano de "Resultados" según objetivo */
+/** @var bool $ocultarConversaciones */
+/** @var bool $ocultarLeads */
 
 $thumb = (string) ($a['image_url'] ?? $a['thumbnail_url'] ?? '');
 $cuerpo = (string) ($a['cuerpo'] ?? '');
@@ -57,18 +60,18 @@ $tipoIcon = match ($tipo) {
             <div><dt>Clicks</dt><dd><?= $fmtNum($a['clicks']) ?></dd></div>
             <div><dt>CTR</dt><dd><?= $fmtPct($a['ctr']) ?></dd></div>
             <?php if (((int) ($a['resultados'] ?? 0)) > 0): ?>
-                <div><dt>Resultados</dt><dd><?= $fmtNum($a['resultados']) ?></dd></div>
+                <div><dt><?= $view->e($labelResultadosCorto ?? 'Resultados') ?></dt><dd><?= $fmtNum($a['resultados']) ?></dd></div>
                 <?php if (isset($a['costo_por_resultado']) && $a['costo_por_resultado'] !== null): ?>
-                    <div><dt>Costo p/result.</dt><dd><?= $view->e($mon) ?> <?= $fmtMoneda($a['costo_por_resultado']) ?></dd></div>
+                    <div><dt>Costo p/<?= $view->e(mb_strtolower($labelResultadosCorto ?? 'resultado')) ?></dt><dd><?= $view->e($mon) ?> <?= $fmtMoneda($a['costo_por_resultado']) ?></dd></div>
                 <?php endif; ?>
             <?php endif; ?>
-            <?php if (((int) ($a['conversaciones'] ?? 0)) > 0): ?>
+            <?php if (((int) ($a['conversaciones'] ?? 0)) > 0 && !($ocultarConversaciones ?? false)): ?>
                 <div><dt>Conversac.</dt><dd><?= $fmtNum($a['conversaciones']) ?></dd></div>
                 <?php if (isset($a['costo_por_conversacion']) && $a['costo_por_conversacion'] !== null): ?>
                     <div><dt>Costo p/conv.</dt><dd><?= $view->e($mon) ?> <?= $fmtMoneda($a['costo_por_conversacion']) ?></dd></div>
                 <?php endif; ?>
             <?php endif; ?>
-            <?php if (((int) ($a['leads'] ?? 0)) > 0): ?>
+            <?php if (((int) ($a['leads'] ?? 0)) > 0 && !($ocultarLeads ?? false)): ?>
                 <div><dt>Leads</dt><dd><?= $fmtNum($a['leads']) ?></dd></div>
             <?php endif; ?>
             <?php if (((int) ($a['landing_page_views'] ?? 0)) > 0): ?>
