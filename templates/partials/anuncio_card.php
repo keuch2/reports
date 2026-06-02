@@ -56,8 +56,20 @@ $tipoIcon = match ($tipo) {
             <div><dt>Impresiones</dt><dd><?= $fmtNum($a['impresiones']) ?></dd></div>
             <div><dt>Clicks</dt><dd><?= $fmtNum($a['clicks']) ?></dd></div>
             <div><dt>CTR</dt><dd><?= $fmtPct($a['ctr']) ?></dd></div>
+            <?php if (((int) ($a['resultados'] ?? 0)) > 0): ?>
+                <div><dt>Resultados</dt><dd><?= $fmtNum($a['resultados']) ?></dd></div>
+                <?php if (isset($a['costo_por_resultado']) && $a['costo_por_resultado'] !== null): ?>
+                    <div><dt>Costo p/result.</dt><dd><?= $view->e($mon) ?> <?= $fmtMoneda($a['costo_por_resultado']) ?></dd></div>
+                <?php endif; ?>
+            <?php endif; ?>
             <?php if (((int) ($a['conversaciones'] ?? 0)) > 0): ?>
                 <div><dt>Conversac.</dt><dd><?= $fmtNum($a['conversaciones']) ?></dd></div>
+                <?php if (isset($a['costo_por_conversacion']) && $a['costo_por_conversacion'] !== null): ?>
+                    <div><dt>Costo p/conv.</dt><dd><?= $view->e($mon) ?> <?= $fmtMoneda($a['costo_por_conversacion']) ?></dd></div>
+                <?php endif; ?>
+            <?php endif; ?>
+            <?php if (((int) ($a['leads'] ?? 0)) > 0): ?>
+                <div><dt>Leads</dt><dd><?= $fmtNum($a['leads']) ?></dd></div>
             <?php endif; ?>
             <?php if (((int) ($a['landing_page_views'] ?? 0)) > 0): ?>
                 <div><dt>Visitas pág.</dt><dd><?= $fmtNum($a['landing_page_views']) ?></dd></div>

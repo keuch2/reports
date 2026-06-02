@@ -54,6 +54,30 @@ final class ImportacionRepository
         );
     }
 
+    /** @return array<string,mixed>|null */
+    public function buscarPorId(int $id): ?array
+    {
+        return $this->db->selectOne(
+            'SELECT id, cuenta_publicitaria_id, rango_inicio, rango_fin, estado, snapshots_afectados
+               FROM importaciones_meta WHERE id = :id',
+            ['id' => $id]
+        );
+    }
+
+    /**
+     * Marca una importación como "snapshots borrados" sin borrar el registro de
+     * la importación en sí (queda en auditoría histórica con snapshots_afectados=0).
+     */
+    public function marcarSnapshotsBorrados(int $id): void
+    {
+        $this->db->execute(
+            'UPDATE importaciones_meta
+                SET snapshots_afectados = 0
+              WHERE id = :id',
+            ['id' => $id]
+        );
+    }
+
     /**
      * Última fecha con snapshots importados para una cuenta (vía sus campañas).
      * Sirve para sugerir importación incremental "solo días faltantes".

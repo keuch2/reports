@@ -21,28 +21,54 @@ use Throwable;
 final class ImportacionService
 {
     /**
-     * Fields para insights diarios a nivel ad. `actions` y `action_values`
-     * vienen como arrays {action_type, value}; extraemos los que nos importan.
+     * Fields para insights diarios a nivel ad. `actions` y `cost_per_action_type`
+     * vienen como arrays {action_type, value}; extraemos los que nos importan
+     * y guardamos el raw en metricas_extendidas para futuras métricas.
      */
     private const INSIGHTS_FIELDS = [
         'date_start', 'date_stop', 'ad_id', 'spend', 'impressions', 'reach', 'frequency',
         'clicks', 'inline_link_clicks', 'ctr', 'cpc', 'cpm',
         'cost_per_result', 'results', 'conversions',
-        'actions',
+        'actions', 'cost_per_action_type',
     ];
 
     /**
-     * action_types que nos interesan, agrupados por la métrica nuestra a la que mapean.
-     * Si Meta retorna varios candidatos, sumamos.
+     * action_types de interés agrupados por la métrica nuestra a la que mapean.
+     * Si Meta retorna varios candidatos coincidentes, los sumamos.
+     *
+     * Convenciones Meta a 2026:
+     * - Mensajes (WhatsApp/Messenger click-to-message):
+     *     onsite_conversion.messaging_conversation_started_7d  (estándar actual)
+     *     onsite_conversion.total_messaging_connection         (alias antiguo)
+     *     onsite_conversion.messaging_first_reply              (alternativa)
+     * - Landing page view: landing_page_view
+     * - Lead (form): leadgen.other, leadgen_grouped, lead, onsite_conversion.lead_grouped
      */
     private const ACTION_TYPES = [
         'conversaciones' => [
             'onsite_conversion.messaging_conversation_started_7d',
             'onsite_conversion.total_messaging_connection',
+            'onsite_conversion.messaging_first_reply',
         ],
         'landing_page_views' => [
             'landing_page_view',
         ],
+        'leads' => [
+            'lead',
+            'leadgen_grouped',
+            'leadgen.other',
+            'onsite_conversion.lead_grouped',
+        ],
+    ];
+
+    /**
+     * action_types para extraer costos desde cost_per_action_type.
+     * Mismos candidatos, primer match gana (no sumamos costos).
+     */
+    private const COST_ACTION_TYPES_CONVERSACION = [
+        'onsite_conversion.messaging_conversation_started_7d',
+        'onsite_conversion.total_messaging_connection',
+        'onsite_conversion.messaging_first_reply',
     ];
 
     /**
@@ -183,8 +209,15 @@ final class ImportacionService
                     continue;
                 }
                 $actions = is_array($i['actions'] ?? null) ? $i['actions'] : [];
+                $costPerAction = is_array($i['cost_per_action_type'] ?? null) ? $i['cost_per_action_type'] : [];
+
                 $conversaciones = $this->sumarActions($actions, self::ACTION_TYPES['conversaciones']);
                 $landingViews = $this->sumarActions($actions, self::ACTION_TYPES['landing_page_views']);
+                $leads = $this->sumarActions($actions, self::ACTION_TYPES['leads']);
+                $costoPorConv = $this->primerCostoPorAction($costPerAction, self::COST_ACTION_TYPES_CONVERSACION);
+
+                // Guardamos los arrays raw en metricas_extendidas para no perder nada.
+                $extendidas = ['actions' => $actions, 'cost_per_action_type' => $costPerAction];
 
                 $this->snapshotsRepo->upsert(
                     nivel: 'ad',
@@ -211,6 +244,9 @@ final class ImportacionService
                         : null,
                     conversaciones: $conversaciones,
                     landingPageViews: $landingViews,
+                    leads: $leads,
+                    costoPorConversacion: $costoPorConv,
+                    metricasExtendidas: $extendidas,
                 );
                 $snapshots++;
             }
@@ -249,6 +285,23 @@ final class ImportacionService
         }
 
         return $encontrado ? $total : null;
+    }
+
+    /**
+     * Devuelve el primer costo encontrado para action_types buscados (no sumamos costos).
+     *
+     * @param list<array<string,mixed>> $costPerActionType
+     * @param list<string> $tiposBuscados
+     */
+    private function primerCostoPorAction(array $costPerActionType, array $tiposBuscados): ?float
+    {
+        foreach ($costPerActionType as $c) {
+            if (in_array((string) ($c['action_type'] ?? ''), $tiposBuscados, true)) {
+                return (float) ($c['value'] ?? 0);
+            }
+        }
+
+        return null;
     }
 
     /**

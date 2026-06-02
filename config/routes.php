@@ -87,6 +87,7 @@ return function (Router $router): void {
     // Auditoría y operación
     $router->get('/admin/auditoria', [AuditoriaController::class, 'listar'], $admin);
     $router->get('/admin/importaciones', [ImportacionHistoricoController::class, 'listar'], $admin);
+    $router->post('/admin/importaciones/{id}/borrar', [ImportacionHistoricoController::class, 'borrarDatos'], $adminCsrf);
 
     // 2FA admin
     $router->get('/admin/2fa', [DosFactorController::class, 'mostrar'], $admin);
