@@ -153,6 +153,21 @@ a { color: var(--color-primary); }
 .shell__user-link { color: var(--color-text); text-decoration: none; padding: 0.25rem 0.5rem; border-radius: var(--radius); transition: background var(--transition); }
 .shell__user-link:hover { background: var(--color-surface-2); }
 .shell__user-link.active { color: var(--color-primary); font-weight: 600; }
+
+/* Banner de preview admin del dashboard cliente */
+.preview-banner {
+    background: linear-gradient(90deg, #fef3c7 0%, #fde68a 100%);
+    border-bottom: 1px solid #fbbf24;
+    padding: 0.65rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.9rem;
+    color: #92400e;
+}
+.preview-banner strong { color: #78350f; }
+.preview-banner .btn { color: #92400e; }
 .shell__body { padding: 2rem 1.5rem; max-width: 1200px; margin: 0 auto; width: 100%; }
 .shell__body h1 { margin-top: 0; }
 

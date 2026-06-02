@@ -23,9 +23,14 @@ $asignadasSet = array_flip($ids_asignadas);
                 <?php if ($cliente['telefono']): ?> · <?= $view->e((string) $cliente['telefono']) ?><?php endif; ?>
             </p>
         </div>
-        <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/permisos') ?>" class="btn btn--link">
-            Configurar permisos avanzados →
-        </a>
+        <div style="display:flex;gap:0.5rem;align-items:center">
+            <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/dashboard') ?>" class="btn btn--primary">
+                👁️ Ver dashboard del cliente
+            </a>
+            <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/permisos') ?>" class="btn btn--link">
+                Permisos avanzados →
+            </a>
+        </div>
     </div>
 
     <?php if ($error): ?><div class="alert alert--error"><?= $view->e((string) $error) ?></div><?php endif; ?>

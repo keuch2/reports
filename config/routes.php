@@ -10,6 +10,7 @@ use MisterCo\Reports\Controllers\Admin\ImportacionHistoricoController;
 use MisterCo\Reports\Controllers\Admin\MetaConexionController;
 use MisterCo\Reports\Controllers\Admin\PermisosController;
 use MisterCo\Reports\Controllers\Admin\PlantillaPdfController;
+use MisterCo\Reports\Controllers\Admin\PreviewClienteController;
 use MisterCo\Reports\Controllers\Admin\UsuarioAdminController;
 use MisterCo\Reports\Controllers\AuthController;
 use MisterCo\Reports\Controllers\PerfilController;
@@ -65,6 +66,10 @@ return function (Router $router): void {
     $router->post('/admin/clientes', [AdminClienteController::class, 'crear'], $adminCsrf);
     $router->get('/admin/clientes/{id}', [AdminClienteController::class, 'detalle'], $admin);
     $router->post('/admin/clientes/{id}/asignar', [AdminClienteController::class, 'asignarCampanias'], $adminCsrf);
+
+    // Preview del dashboard del cliente desde sesión admin (solo lectura)
+    $router->get('/admin/clientes/{id}/dashboard', [PreviewClienteController::class, 'dashboard'], $admin);
+    $router->get('/admin/clientes/{id}/campanias/{cid}', [PreviewClienteController::class, 'detalleCampania'], $admin);
 
     // Permisos avanzados por cliente (anuncios + métricas; campañas se asignan en /admin/clientes/{id})
     $router->get('/admin/clientes/{id}/permisos', [PermisosController::class, 'mostrar'], $admin);
