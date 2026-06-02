@@ -83,7 +83,7 @@ $mon = (string) ($cuenta['moneda'] ?? '');
 </table>
 <?php endif; // resumen_ejecutivo ?>
 
-<?php if ($incluir('tabla_campanias') || $incluir('distribucion_inversion')): ?>
+<?php if ($incluir('tabla_campanias')): ?>
 <h2>Desempeño por campaña</h2>
 <?php if ($campanias === []): ?>
     <p class="muted">No se registraron datos en el rango seleccionado.</p>

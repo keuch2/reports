@@ -75,10 +75,6 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
             <canvas id="grafico-evolucion" height="120"></canvas>
         </article>
 
-        <article class="card" style="margin-top:1.5rem">
-            <h2>Distribución de inversión por campaña</h2>
-            <canvas id="grafico-distribucion" height="100"></canvas>
-        </article>
     <?php endif; ?>
 
     <article class="card" style="margin-top:1.5rem">
@@ -145,18 +141,5 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
         });
     }
 
-    if (campanias.length > 0) {
-        new Chart(document.getElementById('grafico-distribucion'), {
-            type: 'doughnut',
-            data: {
-                labels: campanias.map(c => c.campania),
-                datasets: [{
-                    data: campanias.map(c => c.gasto),
-                    backgroundColor: ['#1a2f6e', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#ec4899']
-                }]
-            },
-            options: { responsive: true, plugins: { legend: { position: 'right' } } }
-        });
-    }
 </script>
 <?php endif; ?>

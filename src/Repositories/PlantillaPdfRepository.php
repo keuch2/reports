@@ -14,7 +14,6 @@ final class PlantillaPdfRepository
         'tabla_campanias' => 'Tabla de campañas',
         'tabla_anuncios' => 'Tabla de anuncios',
         'evolucion_diaria' => 'Evolución diaria',
-        'distribucion_inversion' => 'Distribución de inversión por campaña',
         'comentarios' => 'Comentarios estratégicos',
     ];
 
