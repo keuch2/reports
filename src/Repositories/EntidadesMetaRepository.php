@@ -148,6 +148,28 @@ final class EntidadesMetaRepository
         );
     }
 
+    /**
+     * Campañas de una cuenta que tienen al menos un snapshot importado.
+     * Sirve para la UI de asignación al cliente: no mostramos campañas huérfanas
+     * que quedaron en BD por importaciones viejas borradas.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function campaniasConSnapshotsDeCuenta(int $cuentaId): array
+    {
+        return $this->db->select(
+            'SELECT DISTINCT c.id, c.meta_campaign_id, c.nombre, c.objetivo, c.estado,
+                    c.fecha_inicio, c.fecha_fin
+               FROM campanias c
+               JOIN conjuntos_anuncios cs ON cs.campania_id = c.id
+               JOIN anuncios a ON a.conjunto_anuncios_id = cs.id
+               JOIN metricas_snapshots ms ON ms.entidad_id = a.id AND ms.nivel = \'ad\'
+              WHERE c.cuenta_publicitaria_id = :c
+              ORDER BY c.nombre',
+            ['c' => $cuentaId]
+        );
+    }
+
     /** @return list<array<string,mixed>> Todos los anuncios de una campaña con su adset */
     public function anunciosDeCampania(int $campaniaId): array
     {

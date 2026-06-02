@@ -112,7 +112,7 @@ final class ClienteController
         foreach ($cuentas as $cuenta) {
             $cuentasConCampanias[] = [
                 'cuenta' => $cuenta,
-                'campanias' => $entidadesRepo->campaniasDeCuenta((int) $cuenta['id']),
+                'campanias' => $entidadesRepo->campaniasConSnapshotsDeCuenta((int) $cuenta['id']),
             ];
         }
 
