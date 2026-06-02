@@ -132,6 +132,8 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
         <?php endif; ?>
     </article>
 
+    <?= $view->renderPartial('partials/costos_campania', ['totales' => $totales, 'mon' => $moneda]) ?>
+
     <?php endif; ?>
 </section>
 
