@@ -151,12 +151,12 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
             <?php foreach ($adsets as $g): ?>
                 <?php $listaAds = $anuncios_por_adset[(int) $g['id']] ?? []; ?>
                 <?php if ($listaAds === []) continue; ?>
-                <details class="adset-details" <?= count($adsets) === 1 ? 'open' : '' ?>>
-                    <summary>
-                        <strong><?= $view->e((string) $g['adset_nombre']) ?></strong>
-                        <span class="muted">— <?= count($listaAds) ?> anuncio<?= count($listaAds) === 1 ? '' : 's' ?> · <?= $view->e($mon) ?> <?= $fmtMoneda($g['gasto']) ?> gasto</span>
-                    </summary>
-                    <div class="ads-grid">
+                <section class="adset-block">
+                    <header class="adset-block__header">
+                        <h3><?= $view->e((string) $g['adset_nombre']) ?></h3>
+                        <span class="muted"><?= count($listaAds) ?> anuncio<?= count($listaAds) === 1 ? '' : 's' ?> · <?= $view->e($mon) ?> <?= $fmtMoneda($g['gasto']) ?> gasto</span>
+                    </header>
+                    <div class="ads-list">
                         <?php foreach ($listaAds as $a): ?>
                             <?= $view->renderPartial('partials/anuncio_card', [
                                 'a' => $a,
@@ -170,7 +170,7 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                             ]) ?>
                         <?php endforeach; ?>
                     </div>
-                </details>
+                </section>
             <?php endforeach; ?>
         <?php endif; ?>
     </article>

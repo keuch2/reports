@@ -5,7 +5,7 @@
 /** @var \Closure $fmtMoneda */
 /** @var \Closure $fmtNum */
 /** @var \Closure $fmtPct */
-/** @var string $labelResultadosCorto Nombre humano de "Resultados" según objetivo */
+/** @var string $labelResultadosCorto */
 /** @var bool $ocultarConversaciones */
 /** @var bool $ocultarLeads */
 
@@ -17,30 +17,38 @@ $permalink = (string) ($a['permalink_url'] ?? '');
 $cta = (string) ($a['call_to_action'] ?? '');
 $tipo = (string) ($a['tipo'] ?? '');
 
-$tipoIcon = match ($tipo) {
-    'video' => '▶️',
-    'image' => '🖼️',
-    'link' => '🔗',
-    default => '📄',
+$tipoLabel = match ($tipo) {
+    'video' => 'Video',
+    'image' => 'Imagen',
+    'link' => 'Link',
+    default => 'Anuncio',
 };
+
+$labelCortoLower = mb_strtolower($labelResultadosCorto ?? 'resultado');
 ?>
 <article class="ad-card">
     <div class="ad-card__media">
         <?php if ($thumb !== ''): ?>
-            <img src="<?= $view->e($thumb) ?>" alt="" loading="lazy">
-            <span class="ad-card__type"><?= $tipoIcon ?></span>
+            <a href="<?= $view->e($permalink !== '' ? $permalink : $thumb) ?>" target="_blank" rel="noopener noreferrer">
+                <img src="<?= $view->e($thumb) ?>" alt="<?= $view->e((string) $a['nombre']) ?>" loading="lazy">
+            </a>
+            <span class="ad-card__type"><?= $view->e($tipoLabel) ?></span>
         <?php else: ?>
-            <div class="ad-card__placeholder"><?= $tipoIcon ?> Sin preview</div>
+            <div class="ad-card__placeholder">Sin preview</div>
         <?php endif; ?>
     </div>
     <div class="ad-card__content">
-        <h3 class="ad-card__title"><?= $view->e((string) $a['nombre']) ?></h3>
-        <?php if ($titulo !== ''): ?>
-            <p class="ad-card__creative-title"><?= $view->e($titulo) ?></p>
-        <?php endif; ?>
+        <header class="ad-card__header">
+            <h3 class="ad-card__title"><?= $view->e((string) $a['nombre']) ?></h3>
+            <?php if ($titulo !== ''): ?>
+                <p class="ad-card__creative-title"><?= $view->e($titulo) ?></p>
+            <?php endif; ?>
+        </header>
+
         <?php if ($cuerpo !== ''): ?>
-            <p class="ad-card__copy"><?= nl2br($view->e(mb_strlen($cuerpo) > 220 ? mb_substr($cuerpo, 0, 220) . '…' : $cuerpo)) ?></p>
+            <p class="ad-card__copy"><?= nl2br($view->e(mb_strlen($cuerpo) > 320 ? mb_substr($cuerpo, 0, 320) . '…' : $cuerpo)) ?></p>
         <?php endif; ?>
+
         <?php if ($linkUrl !== '' || $permalink !== ''): ?>
             <p class="ad-card__links">
                 <?php if ($permalink !== ''): ?>
@@ -48,35 +56,69 @@ $tipoIcon = match ($tipo) {
                 <?php endif; ?>
                 <?php if ($linkUrl !== ''): ?>
                     <a href="<?= $view->e($linkUrl) ?>" target="_blank" rel="noopener noreferrer">
-                        <?= $cta !== '' ? $view->e(str_replace('_', ' ', strtolower($cta))) : 'Link de destino' ?> ↗
+                        <?= $cta !== '' ? $view->e(ucfirst(str_replace('_', ' ', strtolower($cta)))) : 'Link de destino' ?> ↗
                     </a>
                 <?php endif; ?>
             </p>
         <?php endif; ?>
 
-        <dl class="ad-card__metrics">
-            <div><dt>Gasto</dt><dd><?= $view->e($mon) ?> <?= $fmtMoneda($a['gasto']) ?></dd></div>
-            <div><dt>Impresiones</dt><dd><?= $fmtNum($a['impresiones']) ?></dd></div>
-            <div><dt>Clicks</dt><dd><?= $fmtNum($a['clicks']) ?></dd></div>
-            <div><dt>CTR</dt><dd><?= $fmtPct($a['ctr']) ?></dd></div>
-            <?php if (((int) ($a['resultados'] ?? 0)) > 0): ?>
-                <div><dt><?= $view->e($labelResultadosCorto ?? 'Resultados') ?></dt><dd><?= $fmtNum($a['resultados']) ?></dd></div>
-                <?php if (isset($a['costo_por_resultado']) && $a['costo_por_resultado'] !== null): ?>
-                    <div><dt>Costo p/<?= $view->e(mb_strtolower($labelResultadosCorto ?? 'resultado')) ?></dt><dd><?= $view->e($mon) ?> <?= $fmtMoneda($a['costo_por_resultado']) ?></dd></div>
+        <table class="ad-card__metrics-table">
+            <tbody>
+                <tr>
+                    <th>Gasto</th>
+                    <td><?= $view->e($mon) ?> <?= $fmtMoneda($a['gasto']) ?></td>
+                    <th>Impresiones</th>
+                    <td><?= $fmtNum($a['impresiones']) ?></td>
+                </tr>
+                <tr>
+                    <th>Clicks</th>
+                    <td><?= $fmtNum($a['clicks']) ?></td>
+                    <th>CTR</th>
+                    <td><?= $fmtPct($a['ctr']) ?></td>
+                </tr>
+                <?php if (((int) ($a['resultados'] ?? 0)) > 0): ?>
+                    <tr>
+                        <th><?= $view->e($labelResultadosCorto ?? 'Resultados') ?></th>
+                        <td><?= $fmtNum($a['resultados']) ?></td>
+                        <?php if (isset($a['costo_por_resultado']) && $a['costo_por_resultado'] !== null): ?>
+                            <th>Costo p/<?= $view->e($labelCortoLower) ?></th>
+                            <td><?= $view->e($mon) ?> <?= $fmtMoneda($a['costo_por_resultado']) ?></td>
+                        <?php else: ?>
+                            <th></th><td></td>
+                        <?php endif; ?>
+                    </tr>
                 <?php endif; ?>
-            <?php endif; ?>
-            <?php if (((int) ($a['conversaciones'] ?? 0)) > 0 && !($ocultarConversaciones ?? false)): ?>
-                <div><dt>Conversac.</dt><dd><?= $fmtNum($a['conversaciones']) ?></dd></div>
-                <?php if (isset($a['costo_por_conversacion']) && $a['costo_por_conversacion'] !== null): ?>
-                    <div><dt>Costo p/conv.</dt><dd><?= $view->e($mon) ?> <?= $fmtMoneda($a['costo_por_conversacion']) ?></dd></div>
+                <?php if (((int) ($a['conversaciones'] ?? 0)) > 0 && !($ocultarConversaciones ?? false)): ?>
+                    <tr>
+                        <th>Conversaciones</th>
+                        <td><?= $fmtNum($a['conversaciones']) ?></td>
+                        <?php if (isset($a['costo_por_conversacion']) && $a['costo_por_conversacion'] !== null): ?>
+                            <th>Costo p/conv.</th>
+                            <td><?= $view->e($mon) ?> <?= $fmtMoneda($a['costo_por_conversacion']) ?></td>
+                        <?php else: ?>
+                            <th></th><td></td>
+                        <?php endif; ?>
+                    </tr>
                 <?php endif; ?>
-            <?php endif; ?>
-            <?php if (((int) ($a['leads'] ?? 0)) > 0 && !($ocultarLeads ?? false)): ?>
-                <div><dt>Leads</dt><dd><?= $fmtNum($a['leads']) ?></dd></div>
-            <?php endif; ?>
-            <?php if (((int) ($a['landing_page_views'] ?? 0)) > 0): ?>
-                <div><dt>Visitas pág.</dt><dd><?= $fmtNum($a['landing_page_views']) ?></dd></div>
-            <?php endif; ?>
-        </dl>
+                <?php if (((int) ($a['leads'] ?? 0)) > 0 && !($ocultarLeads ?? false)): ?>
+                    <tr>
+                        <th>Leads</th>
+                        <td><?= $fmtNum($a['leads']) ?></td>
+                        <?php if (((int) ($a['landing_page_views'] ?? 0)) > 0): ?>
+                            <th>Visitas pág.</th>
+                            <td><?= $fmtNum($a['landing_page_views']) ?></td>
+                        <?php else: ?>
+                            <th></th><td></td>
+                        <?php endif; ?>
+                    </tr>
+                <?php elseif (((int) ($a['landing_page_views'] ?? 0)) > 0): ?>
+                    <tr>
+                        <th>Visitas pág.</th>
+                        <td><?= $fmtNum($a['landing_page_views']) ?></td>
+                        <th></th><td></td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
 </article>
