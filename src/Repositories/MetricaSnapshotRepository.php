@@ -34,15 +34,18 @@ final class MetricaSnapshotRepository
         ?float $costoPorResultado,
         ?int $resultados,
         ?int $conversiones,
+        ?int $conversaciones = null,
+        ?int $landingPageViews = null,
         array $metricasExtendidas = [],
     ): void {
         $this->db->execute(
             'INSERT INTO metricas_snapshots
                 (nivel, entidad_id, meta_entidad_id, fecha, gasto, impresiones, alcance, frecuencia,
                  clicks_totales, clicks_enlace, ctr, cpc, cpm, costo_por_resultado, resultados, conversiones,
-                 metricas_extendidas)
+                 conversaciones, landing_page_views, metricas_extendidas)
               VALUES
-                (:n, :eid, :mid, :f, :g, :imp, :alc, :fr, :ct, :ce, :ctr, :cpc, :cpm, :cpr, :res, :con, :ext)
+                (:n, :eid, :mid, :f, :g, :imp, :alc, :fr, :ct, :ce, :ctr, :cpc, :cpm, :cpr, :res, :con,
+                 :conv, :lpv, :ext)
               ON DUPLICATE KEY UPDATE
                 meta_entidad_id = VALUES(meta_entidad_id),
                 gasto = VALUES(gasto),
@@ -57,6 +60,8 @@ final class MetricaSnapshotRepository
                 costo_por_resultado = VALUES(costo_por_resultado),
                 resultados = VALUES(resultados),
                 conversiones = VALUES(conversiones),
+                conversaciones = VALUES(conversaciones),
+                landing_page_views = VALUES(landing_page_views),
                 metricas_extendidas = VALUES(metricas_extendidas),
                 importado_en = NOW()',
             [
@@ -65,6 +70,7 @@ final class MetricaSnapshotRepository
                 'ct' => $clicksTotales, 'ce' => $clicksEnlace,
                 'ctr' => $ctr, 'cpc' => $cpc, 'cpm' => $cpm, 'cpr' => $costoPorResultado,
                 'res' => $resultados, 'con' => $conversiones,
+                'conv' => $conversaciones, 'lpv' => $landingPageViews,
                 'ext' => $metricasExtendidas === [] ? null : json_encode($metricasExtendidas, JSON_UNESCAPED_UNICODE),
             ]
         );

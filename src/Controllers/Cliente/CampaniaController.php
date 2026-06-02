@@ -43,7 +43,14 @@ final class CampaniaController
         );
 
         $totales = $dashboard->totalesCampania($clienteId, $campaniaId, $desde, $hasta);
+        $adsets = $dashboard->adsetsDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta);
         $anuncios = $dashboard->anunciosDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta);
+
+        // Agrupar anuncios por adset_id para mostrarlos colapsables debajo de cada grupo.
+        $anunciosPorAdset = [];
+        foreach ($anuncios as $a) {
+            $anunciosPorAdset[(int) $a['adset_id']][] = $a;
+        }
 
         $view = $this->container->get(View::class);
 
@@ -52,7 +59,8 @@ final class CampaniaController
             'titulo' => $cam['nombre'],
             'campania' => $cam,
             'totales' => $totales,
-            'anuncios' => $anuncios,
+            'adsets' => $adsets,
+            'anuncios_por_adset' => $anunciosPorAdset,
             'desde' => $desde,
             'hasta' => $hasta,
             'preset' => $preset,

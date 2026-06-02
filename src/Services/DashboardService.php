@@ -193,12 +193,19 @@ final class DashboardService
                 COALESCE(SUM(ms.impresiones), 0) AS impresiones,
                 COALESCE(SUM(ms.alcance), 0) AS alcance,
                 COALESCE(SUM(ms.clicks_totales), 0) AS clicks,
+                COALESCE(SUM(ms.clicks_enlace), 0) AS clicks_enlace,
+                COALESCE(SUM(ms.conversaciones), 0) AS conversaciones,
+                COALESCE(SUM(ms.landing_page_views), 0) AS landing_page_views,
+                COALESCE(SUM(ms.resultados), 0) AS resultados,
                 CASE WHEN SUM(ms.impresiones) > 0
                      THEN SUM(ms.clicks_totales) / SUM(ms.impresiones) * 100
                      ELSE NULL END AS ctr,
                 CASE WHEN SUM(ms.clicks_totales) > 0
                      THEN SUM(ms.gasto) / SUM(ms.clicks_totales)
-                     ELSE NULL END AS cpc
+                     ELSE NULL END AS cpc,
+                CASE WHEN SUM(ms.impresiones) > 0
+                     THEN SUM(ms.gasto) / SUM(ms.impresiones) * 1000
+                     ELSE NULL END AS cpm
               FROM metricas_snapshots ms
               JOIN anuncios a ON a.id = ms.entidad_id AND ms.nivel = 'ad'
               JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
@@ -211,7 +218,54 @@ final class DashboardService
         return $row ?? $this->cerosCampania();
     }
 
-    /** @return list<array<string,mixed>> Anuncios visibles de una campaña con métricas agregadas */
+    /**
+     * Adsets visibles de una campaña con métricas agregadas (suma de sus anuncios).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function adsetsDeCampaniaConMetricas(int $clienteId, int $campaniaId, string $desde, string $hasta): array
+    {
+        $this->asegurarAccesoCampania($clienteId, $campaniaId);
+        $params = ['cam' => $campaniaId, 'desde' => $desde, 'hasta' => $hasta];
+        $exclAnunciosSql = '';
+        $ocultos = $this->permisos->anunciosOcultosDeCampania($clienteId, $campaniaId);
+        if ($ocultos !== []) {
+            [$ph, $exclParams] = $this->placeholders($ocultos, 'exc_a');
+            $exclAnunciosSql = "AND a.id NOT IN ({$ph})";
+            $params = array_merge($params, $exclParams);
+        }
+
+        return $this->db->select(
+            "SELECT
+                cs.id, cs.nombre AS adset_nombre, cs.estado, cs.optimization_goal,
+                COALESCE(SUM(ms.gasto), 0) AS gasto,
+                COALESCE(SUM(ms.impresiones), 0) AS impresiones,
+                COALESCE(SUM(ms.clicks_totales), 0) AS clicks,
+                COALESCE(SUM(ms.conversaciones), 0) AS conversaciones,
+                COALESCE(SUM(ms.landing_page_views), 0) AS landing_page_views,
+                COALESCE(SUM(ms.resultados), 0) AS resultados,
+                CASE WHEN SUM(ms.impresiones) > 0
+                     THEN SUM(ms.clicks_totales) / SUM(ms.impresiones) * 100
+                     ELSE NULL END AS ctr,
+                CASE WHEN SUM(ms.clicks_totales) > 0
+                     THEN SUM(ms.gasto) / SUM(ms.clicks_totales)
+                     ELSE NULL END AS cpc
+              FROM conjuntos_anuncios cs
+         LEFT JOIN anuncios a ON a.conjunto_anuncios_id = cs.id {$exclAnunciosSql}
+         LEFT JOIN metricas_snapshots ms ON ms.entidad_id = a.id AND ms.nivel = 'ad'
+                                         AND ms.fecha BETWEEN :desde AND :hasta
+             WHERE cs.campania_id = :cam
+          GROUP BY cs.id, cs.nombre, cs.estado, cs.optimization_goal
+          ORDER BY gasto DESC",
+            $params
+        );
+    }
+
+    /**
+     * Anuncios visibles de una campaña con métricas + datos del creative.
+     *
+     * @return list<array<string,mixed>>
+     */
     public function anunciosDeCampaniaConMetricas(int $clienteId, int $campaniaId, string $desde, string $hasta): array
     {
         $this->asegurarAccesoCampania($clienteId, $campaniaId);
@@ -226,21 +280,31 @@ final class DashboardService
 
         return $this->db->select(
             "SELECT
-                a.id, a.nombre, a.tipo, a.thumbnail_url, a.estado,
-                cs.nombre AS adset_nombre,
+                a.id, a.nombre, a.tipo, a.thumbnail_url, a.image_url,
+                a.cuerpo, a.titulo, a.link_url, a.call_to_action, a.permalink_url, a.estado,
+                cs.id AS adset_id, cs.nombre AS adset_nombre,
                 COALESCE(SUM(ms.gasto), 0) AS gasto,
                 COALESCE(SUM(ms.impresiones), 0) AS impresiones,
                 COALESCE(SUM(ms.clicks_totales), 0) AS clicks,
+                COALESCE(SUM(ms.clicks_enlace), 0) AS clicks_enlace,
+                COALESCE(SUM(ms.conversaciones), 0) AS conversaciones,
+                COALESCE(SUM(ms.landing_page_views), 0) AS landing_page_views,
+                COALESCE(SUM(ms.resultados), 0) AS resultados,
                 CASE WHEN SUM(ms.impresiones) > 0
                      THEN SUM(ms.clicks_totales) / SUM(ms.impresiones) * 100
-                     ELSE NULL END AS ctr
+                     ELSE NULL END AS ctr,
+                CASE WHEN SUM(ms.clicks_totales) > 0
+                     THEN SUM(ms.gasto) / SUM(ms.clicks_totales)
+                     ELSE NULL END AS cpc
               FROM anuncios a
               JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
          LEFT JOIN metricas_snapshots ms ON ms.entidad_id = a.id AND ms.nivel = 'ad'
                                          AND ms.fecha BETWEEN :desde AND :hasta
              WHERE cs.campania_id = :cam
                {$exclAnunciosSql}
-          GROUP BY a.id, a.nombre, a.tipo, a.thumbnail_url, a.estado, cs.nombre
+          GROUP BY a.id, a.nombre, a.tipo, a.thumbnail_url, a.image_url,
+                   a.cuerpo, a.titulo, a.link_url, a.call_to_action, a.permalink_url, a.estado,
+                   cs.id, cs.nombre
           ORDER BY gasto DESC",
             $params
         );
@@ -321,7 +385,9 @@ final class DashboardService
     {
         return [
             'gasto' => 0, 'impresiones' => 0, 'alcance' => 0,
-            'clicks' => 0, 'ctr' => null, 'cpc' => null,
+            'clicks' => 0, 'clicks_enlace' => 0,
+            'conversaciones' => 0, 'landing_page_views' => 0, 'resultados' => 0,
+            'ctr' => null, 'cpc' => null, 'cpm' => null,
         ];
     }
 }

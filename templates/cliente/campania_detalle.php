@@ -3,7 +3,8 @@
 /** @var \MisterCo\Reports\Domain\Usuario $usuario */
 /** @var array<string,mixed> $campania */
 /** @var array<string,mixed> $totales */
-/** @var list<array<string,mixed>> $anuncios */
+/** @var list<array<string,mixed>> $adsets */
+/** @var array<int, list<array<string,mixed>>> $anuncios_por_adset */
 /** @var string $desde */
 /** @var string $hasta */
 /** @var string $preset */
@@ -41,63 +42,91 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
     </form>
 
     <div class="kpi-grid">
-        <div class="kpi">
-            <span class="kpi__label">Gasto</span>
-            <span class="kpi__value"><?= $view->e($mon) ?> <?= $fmtMoneda($totales['gasto'] ?? 0) ?></span>
-        </div>
-        <div class="kpi">
-            <span class="kpi__label">Impresiones</span>
-            <span class="kpi__value"><?= $fmtNum($totales['impresiones'] ?? 0) ?></span>
-        </div>
-        <div class="kpi">
-            <span class="kpi__label">Alcance</span>
-            <span class="kpi__value"><?= $fmtNum($totales['alcance'] ?? 0) ?></span>
-        </div>
-        <div class="kpi">
-            <span class="kpi__label">Clicks</span>
-            <span class="kpi__value"><?= $fmtNum($totales['clicks'] ?? 0) ?></span>
-        </div>
-        <div class="kpi">
-            <span class="kpi__label">CTR</span>
-            <span class="kpi__value"><?= $fmtPct($totales['ctr'] ?? null) ?></span>
-        </div>
-        <div class="kpi">
-            <span class="kpi__label">CPC</span>
-            <span class="kpi__value"><?= isset($totales['cpc']) && $totales['cpc'] !== null ? $fmtMoneda($totales['cpc']) : '—' ?></span>
-        </div>
+        <div class="kpi"><span class="kpi__label">Gasto</span><span class="kpi__value"><?= $view->e($mon) ?> <?= $fmtMoneda($totales['gasto'] ?? 0) ?></span></div>
+        <div class="kpi"><span class="kpi__label">Impresiones</span><span class="kpi__value"><?= $fmtNum($totales['impresiones'] ?? 0) ?></span></div>
+        <div class="kpi"><span class="kpi__label">Alcance</span><span class="kpi__value"><?= $fmtNum($totales['alcance'] ?? 0) ?></span></div>
+        <div class="kpi"><span class="kpi__label">Clicks</span><span class="kpi__value"><?= $fmtNum($totales['clicks'] ?? 0) ?></span></div>
+        <div class="kpi"><span class="kpi__label">CTR</span><span class="kpi__value"><?= $fmtPct($totales['ctr'] ?? null) ?></span></div>
+        <div class="kpi"><span class="kpi__label">CPC</span><span class="kpi__value"><?= isset($totales['cpc']) && $totales['cpc'] !== null ? $fmtMoneda($totales['cpc']) : '—' ?></span></div>
+        <?php if (($totales['conversaciones'] ?? 0) > 0): ?>
+            <div class="kpi"><span class="kpi__label">Conversaciones</span><span class="kpi__value"><?= $fmtNum($totales['conversaciones']) ?></span></div>
+        <?php endif; ?>
+        <?php if (($totales['landing_page_views'] ?? 0) > 0): ?>
+            <div class="kpi"><span class="kpi__label">Visitas página</span><span class="kpi__value"><?= $fmtNum($totales['landing_page_views']) ?></span></div>
+        <?php endif; ?>
     </div>
 
     <article class="card" style="margin-top:1.5rem">
-        <h2>Anuncios visibles (<?= count($anuncios) ?>)</h2>
-        <?php if ($anuncios === []): ?>
-            <p class="muted">No hay anuncios visibles para este rango.</p>
+        <h2>Grupos de anuncios (<?= count($adsets) ?>)</h2>
+        <?php if ($adsets === []): ?>
+            <p class="muted">No hay grupos de anuncios visibles para este rango.</p>
         <?php else: ?>
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Anuncio</th>
-                        <th>Conjunto</th>
+                        <th>Grupo</th>
                         <th>Estado</th>
                         <th class="num">Gasto</th>
                         <th class="num">Impresiones</th>
                         <th class="num">Clicks</th>
                         <th class="num">CTR</th>
+                        <th class="num">CPC</th>
+                        <th class="num">Conversac.</th>
+                        <th class="num">Visitas pág.</th>
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($anuncios as $a): ?>
+                <?php foreach ($adsets as $g): ?>
                     <tr>
-                        <td><?= $view->e((string) $a['nombre']) ?></td>
-                        <td><?= $view->e((string) ($a['adset_nombre'] ?? '—')) ?></td>
-                        <td><?= $view->e((string) ($a['estado'] ?? '—')) ?></td>
-                        <td class="num"><?= $view->e($mon) ?> <?= $fmtMoneda($a['gasto']) ?></td>
-                        <td class="num"><?= $fmtNum($a['impresiones']) ?></td>
-                        <td class="num"><?= $fmtNum($a['clicks']) ?></td>
-                        <td class="num"><?= $fmtPct($a['ctr']) ?></td>
+                        <td><strong><?= $view->e((string) $g['adset_nombre']) ?></strong>
+                            <?php if ($g['optimization_goal']): ?>
+                                <br><small class="muted"><?= $view->e((string) $g['optimization_goal']) ?></small>
+                            <?php endif; ?>
+                        </td>
+                        <td><?= $view->e((string) ($g['estado'] ?? '—')) ?></td>
+                        <td class="num"><?= $view->e($mon) ?> <?= $fmtMoneda($g['gasto']) ?></td>
+                        <td class="num"><?= $fmtNum($g['impresiones']) ?></td>
+                        <td class="num"><?= $fmtNum($g['clicks']) ?></td>
+                        <td class="num"><?= $fmtPct($g['ctr']) ?></td>
+                        <td class="num"><?= $g['cpc'] !== null ? $fmtMoneda($g['cpc']) : '—' ?></td>
+                        <td class="num"><?= ((int) ($g['conversaciones'] ?? 0)) > 0 ? $fmtNum($g['conversaciones']) : '—' ?></td>
+                        <td class="num"><?= ((int) ($g['landing_page_views'] ?? 0)) > 0 ? $fmtNum($g['landing_page_views']) : '—' ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
+        <?php endif; ?>
+    </article>
+
+    <article class="card" style="margin-top:1.5rem">
+        <h2>Anuncios</h2>
+        <?php $totalAds = array_sum(array_map('count', $anuncios_por_adset)); ?>
+        <?php if ($totalAds === 0): ?>
+            <p class="muted">No hay anuncios visibles para este rango.</p>
+        <?php else: ?>
+            <p class="muted"><?= $totalAds ?> anuncio<?= $totalAds === 1 ? '' : 's' ?> distribuido<?= $totalAds === 1 ? '' : 's' ?> en los grupos de arriba. Click en un grupo para expandir sus creativos.</p>
+
+            <?php foreach ($adsets as $g): ?>
+                <?php $listaAds = $anuncios_por_adset[(int) $g['id']] ?? []; ?>
+                <?php if ($listaAds === []) continue; ?>
+                <details class="adset-details" <?= count($adsets) === 1 ? 'open' : '' ?>>
+                    <summary>
+                        <strong><?= $view->e((string) $g['adset_nombre']) ?></strong>
+                        <span class="muted">— <?= count($listaAds) ?> anuncio<?= count($listaAds) === 1 ? '' : 's' ?> · <?= $view->e($mon) ?> <?= $fmtMoneda($g['gasto']) ?> gasto</span>
+                    </summary>
+                    <div class="ads-grid">
+                        <?php foreach ($listaAds as $a): ?>
+                            <?= $view->renderPartial('partials/anuncio_card', [
+                                'a' => $a,
+                                'mon' => $mon,
+                                'fmtMoneda' => $fmtMoneda,
+                                'fmtNum' => $fmtNum,
+                                'fmtPct' => $fmtPct,
+                            ]) ?>
+                        <?php endforeach; ?>
+                    </div>
+                </details>
+            <?php endforeach; ?>
         <?php endif; ?>
     </article>
 </section>

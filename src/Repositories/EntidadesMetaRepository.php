@@ -88,18 +88,35 @@ final class EntidadesMetaRepository
         ?string $tipo,
         ?string $thumbnailUrl,
         ?string $estado,
+        ?string $cuerpo = null,
+        ?string $titulo = null,
+        ?string $linkUrl = null,
+        ?string $imageUrl = null,
+        ?string $callToAction = null,
+        ?string $permalinkUrl = null,
     ): int {
         $this->db->execute(
-            'INSERT INTO anuncios (meta_ad_id, conjunto_anuncios_id, nombre, creative_id, tipo, thumbnail_url, estado)
-                  VALUES (:mid, :sid, :n, :cre, :t, :th, :est)
-                  ON DUPLICATE KEY UPDATE nombre = VALUES(nombre),
-                                          creative_id = VALUES(creative_id),
-                                          tipo = VALUES(tipo),
-                                          thumbnail_url = VALUES(thumbnail_url),
-                                          estado = VALUES(estado)',
+            'INSERT INTO anuncios
+                (meta_ad_id, conjunto_anuncios_id, nombre, creative_id, tipo, thumbnail_url, estado,
+                 cuerpo, titulo, link_url, image_url, call_to_action, permalink_url)
+              VALUES (:mid, :sid, :n, :cre, :t, :th, :est, :cu, :ti, :lu, :iu, :cta, :pu)
+              ON DUPLICATE KEY UPDATE
+                nombre = VALUES(nombre),
+                creative_id = VALUES(creative_id),
+                tipo = VALUES(tipo),
+                thumbnail_url = VALUES(thumbnail_url),
+                estado = VALUES(estado),
+                cuerpo = VALUES(cuerpo),
+                titulo = VALUES(titulo),
+                link_url = VALUES(link_url),
+                image_url = VALUES(image_url),
+                call_to_action = VALUES(call_to_action),
+                permalink_url = VALUES(permalink_url)',
             [
                 'mid' => $metaAdId, 'sid' => $conjuntoAnunciosId, 'n' => $nombre,
                 'cre' => $creativeId, 't' => $tipo, 'th' => $thumbnailUrl, 'est' => $estado,
+                'cu' => $cuerpo, 'ti' => $titulo, 'lu' => $linkUrl, 'iu' => $imageUrl,
+                'cta' => $callToAction, 'pu' => $permalinkUrl,
             ]
         );
         $row = $this->db->selectOne('SELECT id FROM anuncios WHERE meta_ad_id = :id', ['id' => $metaAdId]);
@@ -135,13 +152,43 @@ final class EntidadesMetaRepository
     public function anunciosDeCampania(int $campaniaId): array
     {
         return $this->db->select(
-            'SELECT a.id, a.meta_ad_id, a.nombre, a.tipo, a.thumbnail_url, a.estado,
+            'SELECT a.id, a.meta_ad_id, a.nombre, a.tipo, a.thumbnail_url, a.image_url,
+                    a.cuerpo, a.titulo, a.link_url, a.call_to_action, a.permalink_url, a.estado,
                     cs.nombre AS adset_nombre, cs.id AS adset_id
                FROM anuncios a
                JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
               WHERE cs.campania_id = :c
            ORDER BY cs.nombre, a.nombre',
             ['c' => $campaniaId]
+        );
+    }
+
+    /** @return list<array<string,mixed>> Adsets de una campaña */
+    public function adsetsDeCampania(int $campaniaId): array
+    {
+        return $this->db->select(
+            'SELECT id, meta_adset_id, nombre, estado, optimization_goal,
+                    presupuesto_diario, presupuesto_total
+               FROM conjuntos_anuncios
+              WHERE campania_id = :c
+           ORDER BY nombre',
+            ['c' => $campaniaId]
+        );
+    }
+
+    /** @return array<string,mixed>|null */
+    public function buscarAdset(int $adsetId): ?array
+    {
+        return $this->db->selectOne(
+            'SELECT cs.id, cs.meta_adset_id, cs.nombre, cs.estado, cs.optimization_goal,
+                    cs.presupuesto_diario, cs.presupuesto_total, cs.campania_id,
+                    c.nombre AS campania_nombre, c.cuenta_publicitaria_id,
+                    cp.nombre AS cuenta_nombre, cp.moneda
+               FROM conjuntos_anuncios cs
+               JOIN campanias c ON c.id = cs.campania_id
+               JOIN cuentas_publicitarias cp ON cp.id = c.cuenta_publicitaria_id
+              WHERE cs.id = :id',
+            ['id' => $adsetId]
         );
     }
 

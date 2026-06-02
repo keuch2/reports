@@ -108,7 +108,13 @@ final class PreviewClienteController
         );
 
         $totales = $service->totalesCampania($clienteId, $campaniaId, $desde, $hasta);
+        $adsets = $service->adsetsDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta);
         $anuncios = $service->anunciosDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta);
+
+        $anunciosPorAdset = [];
+        foreach ($anuncios as $a) {
+            $anunciosPorAdset[(int) $a['adset_id']][] = $a;
+        }
 
         $view = $this->container->get(View::class);
 
@@ -118,7 +124,8 @@ final class PreviewClienteController
             'cliente' => $cliente,
             'campania' => $cam,
             'totales' => $totales,
-            'anuncios' => $anuncios,
+            'adsets' => $adsets,
+            'anuncios_por_adset' => $anunciosPorAdset,
             'desde' => $desde,
             'hasta' => $hasta,
             'preset' => $preset,

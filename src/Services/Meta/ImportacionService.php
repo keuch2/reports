@@ -13,14 +13,46 @@ use Throwable;
 
 /**
  * Importa la jerarquía completa de una cuenta publicitaria + métricas diarias
- * a nivel ad para el rango indicado. Idempotente vía upserts.
+ * a nivel ad + datos del creative (post, copy, imagen, link). Idempotente vía upserts.
+ *
+ * Snapshots a nivel ad. Para mostrar resultados por adset/campaña agregamos en SQL
+ * sumando los ads que pertenecen al adset/campaña.
  */
 final class ImportacionService
 {
-    /** Fields que pedimos a Meta para insights diarios a nivel ad. */
+    /**
+     * Fields para insights diarios a nivel ad. `actions` y `action_values`
+     * vienen como arrays {action_type, value}; extraemos los que nos importan.
+     */
     private const INSIGHTS_FIELDS = [
         'date_start', 'date_stop', 'ad_id', 'spend', 'impressions', 'reach', 'frequency',
-        'clicks', 'inline_link_clicks', 'ctr', 'cpc', 'cpm', 'cost_per_result', 'results', 'conversions',
+        'clicks', 'inline_link_clicks', 'ctr', 'cpc', 'cpm',
+        'cost_per_result', 'results', 'conversions',
+        'actions',
+    ];
+
+    /**
+     * action_types que nos interesan, agrupados por la métrica nuestra a la que mapean.
+     * Si Meta retorna varios candidatos, sumamos.
+     */
+    private const ACTION_TYPES = [
+        'conversaciones' => [
+            'onsite_conversion.messaging_conversation_started_7d',
+            'onsite_conversion.total_messaging_connection',
+        ],
+        'landing_page_views' => [
+            'landing_page_view',
+        ],
+    ];
+
+    /**
+     * Fields del creative que nos interesan para mostrar el anuncio al cliente.
+     * Meta los devuelve dentro de `creative{...}` cuando se piden en la query del ad.
+     */
+    private const CREATIVE_FIELDS = [
+        'id', 'body', 'title', 'image_url', 'thumbnail_url',
+        'object_story_spec', 'call_to_action_type', 'link_url',
+        'effective_object_story_id', 'instagram_permalink_url',
     ];
 
     public function __construct(
@@ -33,9 +65,6 @@ final class ImportacionService
     }
 
     /**
-     * Ejecuta una importación completa. Síncrono — el caller debe usar
-     * set_time_limit(0) y ignore_user_abort(true) antes de invocar.
-     *
      * @return array{importacion_id:int, campanias:int, adsets:int, anuncios:int, snapshots:int}
      */
     public function importar(int $cuentaId, string $rangoInicio, string $rangoFin, int $usuarioId): array
@@ -106,9 +135,13 @@ final class ImportacionService
                 $adsets++;
             }
 
-            // 3) Ads
+            // 3) Ads + creative
+            $creativeFieldsExpr = 'creative{' . implode(',', self::CREATIVE_FIELDS) . '}';
             foreach ($cliente->paginar("act_{$metaAccountId}/ads", [
-                'fields' => ['id', 'name', 'adset_id', 'creative', 'status', 'preview_shareable_link'],
+                'fields' => [
+                    'id', 'name', 'adset_id', 'status', 'preview_shareable_link',
+                    $creativeFieldsExpr,
+                ],
                 'limit' => 100,
             ]) as $ad) {
                 $llamadas++;
@@ -116,15 +149,21 @@ final class ImportacionService
                 if ($adsetIdInterno === null) {
                     continue;
                 }
-                $creativeId = isset($ad['creative']['id']) ? (string) $ad['creative']['id'] : null;
+                $datosCreative = $this->extraerCreative($ad['creative'] ?? [], (string) ($ad['preview_shareable_link'] ?? ''));
                 $this->entidadesRepo->upsertAnuncio(
                     metaAdId: (string) $ad['id'],
                     conjuntoAnunciosId: $adsetIdInterno,
                     nombre: (string) ($ad['name'] ?? 'Sin nombre'),
-                    creativeId: $creativeId,
-                    tipo: null,
-                    thumbnailUrl: null,
+                    creativeId: $datosCreative['creative_id'],
+                    tipo: $datosCreative['tipo'],
+                    thumbnailUrl: $datosCreative['thumbnail_url'],
                     estado: isset($ad['status']) ? (string) $ad['status'] : null,
+                    cuerpo: $datosCreative['cuerpo'],
+                    titulo: $datosCreative['titulo'],
+                    linkUrl: $datosCreative['link_url'],
+                    imageUrl: $datosCreative['image_url'],
+                    callToAction: $datosCreative['call_to_action'],
+                    permalinkUrl: $datosCreative['permalink_url'],
                 );
                 $anuncios++;
             }
@@ -143,6 +182,10 @@ final class ImportacionService
                 if ($adIdInterno === null) {
                     continue;
                 }
+                $actions = is_array($i['actions'] ?? null) ? $i['actions'] : [];
+                $conversaciones = $this->sumarActions($actions, self::ACTION_TYPES['conversaciones']);
+                $landingViews = $this->sumarActions($actions, self::ACTION_TYPES['landing_page_views']);
+
                 $this->snapshotsRepo->upsert(
                     nivel: 'ad',
                     entidadId: $adIdInterno,
@@ -166,6 +209,8 @@ final class ImportacionService
                     conversiones: isset($i['conversions'][0]['value'])
                         ? (int) $i['conversions'][0]['value']
                         : null,
+                    conversaciones: $conversaciones,
+                    landingPageViews: $landingViews,
                 );
                 $snapshots++;
             }
@@ -183,6 +228,96 @@ final class ImportacionService
             'adsets' => $adsets,
             'anuncios' => $anuncios,
             'snapshots' => $snapshots,
+        ];
+    }
+
+    /**
+     * Suma los valores de `actions` cuyo `action_type` matchea alguno de los buscados.
+     *
+     * @param list<array<string,mixed>> $actions
+     * @param list<string> $tiposBuscados
+     */
+    private function sumarActions(array $actions, array $tiposBuscados): ?int
+    {
+        $total = 0;
+        $encontrado = false;
+        foreach ($actions as $a) {
+            if (in_array((string) ($a['action_type'] ?? ''), $tiposBuscados, true)) {
+                $total += (int) ($a['value'] ?? 0);
+                $encontrado = true;
+            }
+        }
+
+        return $encontrado ? $total : null;
+    }
+
+    /**
+     * Normaliza los datos del creative que vienen anidados.
+     *
+     * @param array<string,mixed> $creative
+     * @return array{creative_id:?string, tipo:?string, thumbnail_url:?string, cuerpo:?string,
+     *               titulo:?string, link_url:?string, image_url:?string,
+     *               call_to_action:?string, permalink_url:?string}
+     */
+    private function extraerCreative(array $creative, string $permalinkFallback): array
+    {
+        $creativeId = isset($creative['id']) ? (string) $creative['id'] : null;
+        $thumbnail = $creative['thumbnail_url'] ?? null;
+        $image = $creative['image_url'] ?? null;
+        $body = $creative['body'] ?? null;
+        $title = $creative['title'] ?? null;
+        $linkUrl = $creative['link_url'] ?? null;
+        $cta = $creative['call_to_action_type'] ?? null;
+        $permalink = $creative['effective_object_story_id'] ?? null;
+
+        // object_story_spec puede traer el contenido real del post (link_data, video_data, photo_data).
+        $story = $creative['object_story_spec'] ?? [];
+        if (is_array($story)) {
+            foreach (['link_data', 'video_data', 'photo_data'] as $key) {
+                $data = $story[$key] ?? null;
+                if (!is_array($data)) {
+                    continue;
+                }
+                $body = $body ?? ($data['message'] ?? null);
+                $title = $title ?? ($data['name'] ?? null);
+                $linkUrl = $linkUrl ?? ($data['link'] ?? null);
+                $image = $image ?? ($data['picture'] ?? null);
+                if (isset($data['call_to_action']['type'])) {
+                    $cta = $cta ?? $data['call_to_action']['type'];
+                }
+            }
+        }
+
+        // Determinar tipo del anuncio para iconito en la UI.
+        $tipo = null;
+        if (isset($creative['video_id']) || isset($story['video_data'])) {
+            $tipo = 'video';
+        } elseif (isset($story['photo_data']) || $image !== null) {
+            $tipo = 'image';
+        } elseif (isset($story['link_data'])) {
+            $tipo = 'link';
+        }
+
+        $permalinkUrl = null;
+        if ($creative['instagram_permalink_url'] ?? null) {
+            $permalinkUrl = (string) $creative['instagram_permalink_url'];
+        } elseif ($permalink !== null) {
+            // effective_object_story_id es del tipo "pageId_postId"; armamos URL de FB.
+            $permalinkUrl = 'https://www.facebook.com/' . str_replace('_', '/posts/', (string) $permalink);
+        } elseif ($permalinkFallback !== '') {
+            $permalinkUrl = $permalinkFallback;
+        }
+
+        return [
+            'creative_id' => $creativeId,
+            'tipo' => $tipo,
+            'thumbnail_url' => $thumbnail !== null ? (string) $thumbnail : null,
+            'cuerpo' => $body !== null ? (string) $body : null,
+            'titulo' => $title !== null ? (string) $title : null,
+            'link_url' => $linkUrl !== null ? (string) $linkUrl : null,
+            'image_url' => $image !== null ? (string) $image : null,
+            'call_to_action' => $cta !== null ? (string) $cta : null,
+            'permalink_url' => $permalinkUrl,
         ];
     }
 
