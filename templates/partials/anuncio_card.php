@@ -11,22 +11,18 @@
 
 use MisterCo\Reports\Domain\ObjetivoCampania;
 
-// Mostramos una sola "métrica de resultado" según el objetivo real del adset
-// (optimization_goal) o, si no está, el objetivo de la campaña. Evita duplicar
-// (ej. adset CONVERSATIONS bajo campaña OUTCOME_LEADS → solo conversaciones).
-$optGoal = strtoupper((string) ($a['optimization_goal'] ?? ''));
+// La métrica de "Resultados" se decide por el OBJETIVO de la campaña, no por
+// optimization_goal del adset (que es estrategia de subasta).
 $objetivoCam = strtoupper((string) ($a['objetivo_campania'] ?? ''));
-$esLeads = in_array($optGoal, ['LEAD_GENERATION', 'QUALITY_LEAD', 'LEAD'], true)
-    || ($optGoal === '' && in_array($objetivoCam, ['OUTCOME_LEADS', 'LEAD_GENERATION'], true));
-$esMensajes = in_array($optGoal, ['CONVERSATIONS', 'REPLIES'], true)
-    || ($optGoal === '' && in_array($objetivoCam, ['MESSAGES', 'OUTCOME_ENGAGEMENT'], true));
+$esLeads = in_array($objetivoCam, ['OUTCOME_LEADS', 'LEAD_GENERATION'], true);
+$esMensajes = in_array($objetivoCam, ['MESSAGES', 'OUTCOME_ENGAGEMENT'], true);
 
-// Si la fila "Resultados" ya muestra conversaciones/leads, no repetimos esa
-// métrica en una fila aparte.
-$resultadosEsConversaciones = $esMensajes;
-$resultadosEsLeads = $esLeads;
-$mostrarConversaciones = !$esLeads && !$resultadosEsConversaciones && !($ocultarConversaciones ?? false);
-$mostrarLeads = !$esMensajes && !$resultadosEsLeads && !($ocultarLeads ?? false);
+// Reglas:
+// - Campaña de LEADS → "Resultados" = clientes potenciales; no mostrar
+//   conversaciones (los click-to-WA son ruido, no el resultado de negocio).
+// - Campaña de MENSAJES → "Resultados" = conversaciones; no mostrar leads.
+$mostrarConversaciones = !$esLeads && !$esMensajes && !($ocultarConversaciones ?? false);
+$mostrarLeads = !$esMensajes && !$esLeads && !($ocultarLeads ?? false);
 
 $thumb = (string) ($a['image_url'] ?? $a['thumbnail_url'] ?? '');
 $cuerpo = (string) ($a['cuerpo'] ?? '');
@@ -43,9 +39,9 @@ $tipoLabel = match ($tipo) {
     default => 'Anuncio',
 };
 
-// Etiqueta de "Resultados" según el optimization_goal del adset (más específico
-// que el objective de la campaña, que el partial recibe como labelResultadosCorto).
-$labelAdset = $optGoal !== '' ? ObjetivoCampania::nombreCortoResultados($optGoal)
+// Etiqueta de "Resultados" según el OBJETIVO de la campaña.
+$labelAdset = $objetivoCam !== ''
+    ? ObjetivoCampania::nombreCortoResultados($objetivoCam)
     : ($labelResultadosCorto ?? 'Resultados');
 $labelCortoLower = mb_strtolower($labelAdset);
 ?>

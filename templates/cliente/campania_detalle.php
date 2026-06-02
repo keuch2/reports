@@ -98,9 +98,9 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                 </thead>
                 <tbody>
                 <?php foreach ($adsets as $g):
-                    // optimization_goal del adset gana sobre el objective de la campaña.
-                    $objAdset = $g['optimization_goal'] ?: ($g['objetivo_campania'] ?? $objetivo);
-                    $labelCorto = ObjetivoCampania::nombreCortoResultados((string) $objAdset);
+                    $labelCorto = ObjetivoCampania::nombreCortoResultados(
+                        (string) ($g['objetivo_campania'] ?? $objetivo)
+                    );
                 ?>
                     <tr>
                         <td><strong><?= $view->e((string) $g['adset_nombre']) ?></strong>
