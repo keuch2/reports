@@ -21,8 +21,12 @@ $esLeads = in_array($optGoal, ['LEAD_GENERATION', 'QUALITY_LEAD', 'LEAD'], true)
 $esMensajes = in_array($optGoal, ['CONVERSATIONS', 'REPLIES'], true)
     || ($optGoal === '' && in_array($objetivoCam, ['MESSAGES', 'OUTCOME_ENGAGEMENT'], true));
 
-$mostrarConversaciones = !$esLeads && !($ocultarConversaciones ?? false);
-$mostrarLeads = !$esMensajes && !($ocultarLeads ?? false);
+// Si la fila "Resultados" ya muestra conversaciones/leads, no repetimos esa
+// métrica en una fila aparte.
+$resultadosEsConversaciones = $esMensajes;
+$resultadosEsLeads = $esLeads;
+$mostrarConversaciones = !$esLeads && !$resultadosEsConversaciones && !($ocultarConversaciones ?? false);
+$mostrarLeads = !$esMensajes && !$resultadosEsLeads && !($ocultarLeads ?? false);
 
 $thumb = (string) ($a['image_url'] ?? $a['thumbnail_url'] ?? '');
 $cuerpo = (string) ($a['cuerpo'] ?? '');
