@@ -139,6 +139,33 @@ final class DashboardService
     }
 
     /**
+     * Meses (YYYY-MM) con snapshots para alguna de las campañas asignadas al
+     * cliente. Sirve para el selector del dashboard home. Ordenado más reciente
+     * primero.
+     *
+     * @return list<string>
+     */
+    public function mesesConDatosDelCliente(int $clienteId): array
+    {
+        $idsCampanias = $this->idsCampaniasAsignadas($clienteId);
+        if ($idsCampanias === []) {
+            return [];
+        }
+        [$camsPlaceholders, $camsParams] = $this->placeholders($idsCampanias, 'cam');
+
+        $rows = $this->db->select(
+            "SELECT DISTINCT DATE_FORMAT(ms.fecha, '%Y-%m') AS mes
+               FROM metricas_snapshots ms
+               JOIN anuncios a ON a.id = ms.entidad_id AND ms.nivel = 'ad'
+               JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
+              WHERE cs.campania_id IN ({$camsPlaceholders})
+              ORDER BY mes DESC",
+            $camsParams
+        );
+        return array_map(static fn ($r) => (string) $r['mes'], $rows);
+    }
+
+    /**
      * Serie temporal diaria agregada sobre las campañas asignadas.
      *
      * @return list<array<string,mixed>>

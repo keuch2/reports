@@ -44,11 +44,16 @@ final class DashboardController
             ]));
         }
 
-        [$desde, $hasta, $preset] = $this->resolverRango(
-            (string) $request->input('preset', $prefs['rango_default']),
-            (string) $request->input('desde', ''),
-            (string) $request->input('hasta', ''),
-        );
+        $mesesDisponibles = $service->mesesConDatosDelCliente($clienteId);
+        $mesSeleccionado = $this->resolverMes((string) $request->input('mes', ''), $mesesDisponibles);
+        if ($mesSeleccionado === null) {
+            $desde = date('Y-m-01');
+            $hasta = date('Y-m-t');
+        } else {
+            $ts = strtotime($mesSeleccionado . '-01');
+            $desde = date('Y-m-01', $ts);
+            $hasta = date('Y-m-t', $ts);
+        }
 
         $totales = $service->totalesGlobales($clienteId, $desde, $hasta);
         $campanias = $service->porCampania($clienteId, $desde, $hasta);
@@ -72,7 +77,8 @@ final class DashboardController
             'moneda' => $monedaPredominante,
             'desde' => $desde,
             'hasta' => $hasta,
-            'preset' => $preset,
+            'mes_seleccionado' => $mesSeleccionado,
+            'meses_disponibles' => $mesesDisponibles,
             'totales' => $totales,
             'campanias' => $campanias,
             'evolucion' => $evolucion,
@@ -82,30 +88,15 @@ final class DashboardController
         ]));
     }
 
-    /** @return array{0:string,1:string,2:string} [desde, hasta, preset] */
-    private function resolverRango(string $preset, string $desdeInput, string $hastaInput): array
+    /** @param list<string> $disponibles */
+    private function resolverMes(string $mes, array $disponibles): ?string
     {
-        $hoy = date('Y-m-d');
-        $presets = [
-            'hoy' => [$hoy, $hoy],
-            'ayer' => [date('Y-m-d', strtotime('-1 day')), date('Y-m-d', strtotime('-1 day'))],
-            'ultimos_7_dias' => [date('Y-m-d', strtotime('-7 days')), $hoy],
-            'ultimos_30_dias' => [date('Y-m-d', strtotime('-30 days')), $hoy],
-            'mes_actual' => [date('Y-m-01'), $hoy],
-            'mes_pasado' => [date('Y-m-01', strtotime('first day of last month')), date('Y-m-t', strtotime('last day of last month'))],
-        ];
-
-        if ($preset === 'personalizado' && $this->fechaValida($desdeInput) && $this->fechaValida($hastaInput)) {
-            return [$desdeInput, $hastaInput, 'personalizado'];
+        if ($disponibles === []) {
+            return null;
         }
-
-        $r = $presets[$preset] ?? $presets['ultimos_30_dias'];
-
-        return [$r[0], $r[1], array_key_exists($preset, $presets) ? $preset : 'ultimos_30_dias'];
-    }
-
-    private function fechaValida(string $f): bool
-    {
-        return (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $f) && strtotime($f) !== false;
+        if ($mes !== '' && in_array($mes, $disponibles, true)) {
+            return $mes;
+        }
+        return $disponibles[0];
     }
 }

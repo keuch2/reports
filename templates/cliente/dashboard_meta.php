@@ -5,7 +5,8 @@
 /** @var string $moneda */
 /** @var string $desde */
 /** @var string $hasta */
-/** @var string $preset */
+/** @var string|null $mes_seleccionado */
+/** @var list<string> $meses_disponibles */
 /** @var array<string,mixed> $totales */
 /** @var list<array<string,mixed>> $campanias */
 /** @var list<array<string,mixed>> $evolucion */
@@ -40,22 +41,35 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
         </div>
     </div>
 
-    <form method="GET" action="<?= $view->url('/cliente') ?>" class="dashboard-filters">
-        <label class="field">
-            <span class="field__label">Rango</span>
-            <select class="field__input" name="preset" onchange="this.form.submit()">
-                <option value="hoy" <?= $preset === 'hoy' ? 'selected' : '' ?>>Hoy</option>
-                <option value="ayer" <?= $preset === 'ayer' ? 'selected' : '' ?>>Ayer</option>
-                <option value="ultimos_7_dias" <?= $preset === 'ultimos_7_dias' ? 'selected' : '' ?>>Últimos 7 días</option>
-                <option value="ultimos_30_dias" <?= $preset === 'ultimos_30_dias' ? 'selected' : '' ?>>Últimos 30 días</option>
-                <option value="mes_actual" <?= $preset === 'mes_actual' ? 'selected' : '' ?>>Mes actual</option>
-                <option value="mes_pasado" <?= $preset === 'mes_pasado' ? 'selected' : '' ?>>Mes pasado</option>
-            </select>
-        </label>
+    <?php
+    $mesesNombre = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    $formatMes = static function (string $yyyymm) use ($mesesNombre): string {
+        $partes = explode('-', $yyyymm);
+        if (count($partes) !== 2) return $yyyymm;
+        $mes = (int) $partes[1];
+        return ucfirst($mesesNombre[$mes - 1] ?? '') . ' ' . $partes[0];
+    };
+    ?>
+    <?php if ($meses_disponibles === []): ?>
+        <p class="muted">Aún no hay datos importados para tus campañas.</p>
+    <?php else: ?>
+        <form method="GET" action="<?= $view->url('/cliente') ?>" class="dashboard-filters">
+            <label class="field">
+                <span class="field__label">Mes</span>
+                <select class="field__input" name="mes" onchange="this.form.submit()">
+                    <?php foreach ($meses_disponibles as $m): ?>
+                        <option value="<?= $view->e($m) ?>" <?= $m === $mes_seleccionado ? 'selected' : '' ?>>
+                            <?= $view->e($formatMes($m)) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <span class="muted" style="align-self:center"><?= $view->e($desde) ?> → <?= $view->e($hasta) ?></span>
 
-        <a href="<?= $view->url('/cliente/reporte/previa?preset=' . ($view->e($preset))) ?>"
-           class="btn btn--primary">📄 Exportar PDF</a>
-    </form>
+            <a href="<?= $view->url('/cliente/reporte/previa?preset=personalizado&desde=' . $view->e($desde) . '&hasta=' . $view->e($hasta)) ?>"
+               class="btn btn--primary">📄 Exportar PDF</a>
+        </form>
+    <?php endif; ?>
 
     <div class="kpi-grid">
         <?php foreach ($widgets_visibles as $codigo): ?>

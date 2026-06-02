@@ -45,11 +45,16 @@ final class PreviewClienteController
 
         $campaniasAsignadas = $service->campaniasDelCliente($clienteId);
 
-        [$desde, $hasta, $preset] = $this->resolverRango(
-            (string) $request->input('preset', $prefs['rango_default']),
-            (string) $request->input('desde', ''),
-            (string) $request->input('hasta', ''),
-        );
+        $mesesDisponibles = $service->mesesConDatosDelCliente($clienteId);
+        $mesSeleccionado = $this->resolverMes((string) $request->input('mes', ''), $mesesDisponibles);
+        if ($mesSeleccionado === null) {
+            $desde = date('Y-m-01');
+            $hasta = date('Y-m-t');
+        } else {
+            $ts = strtotime($mesSeleccionado . '-01');
+            $desde = date('Y-m-01', $ts);
+            $hasta = date('Y-m-t', $ts);
+        }
 
         $totales = $campaniasAsignadas === [] ? [] : $service->totalesGlobales($clienteId, $desde, $hasta);
         $campanias = $campaniasAsignadas === [] ? [] : $service->porCampania($clienteId, $desde, $hasta);
@@ -72,7 +77,8 @@ final class PreviewClienteController
             'moneda' => $moneda,
             'desde' => $desde,
             'hasta' => $hasta,
-            'preset' => $preset,
+            'mes_seleccionado' => $mesSeleccionado,
+            'meses_disponibles' => $mesesDisponibles,
             'totales' => $totales,
             'campanias' => $campanias,
             'evolucion' => $evolucion,
