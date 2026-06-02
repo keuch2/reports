@@ -83,7 +83,7 @@ final class Response
         $csp = "default-src 'self'; "
             . "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             . "style-src 'self' 'unsafe-inline'; "
-            . "img-src 'self' data: https://api.qrserver.com; "
+            . "img-src 'self' data: https://api.qrserver.com https://*.fbcdn.net https://*.cdninstagram.com; "
             . "font-src 'self' data:; "
             . "connect-src 'self'; "
             . "frame-ancestors 'none'; "
