@@ -30,6 +30,7 @@ final class ImportacionRepository
         int $anuncios,
         int $snapshots,
         int $llamadas,
+        ?string $warnings = null,
     ): void {
         $this->db->execute(
             'UPDATE importaciones_meta
@@ -37,9 +38,14 @@ final class ImportacionRepository
                     finalizado_en = NOW(),
                     campanias_afectadas = :c, adsets_afectados = :a,
                     anuncios_afectados = :an, snapshots_afectados = :s,
-                    llamadas_meta = :l
+                    llamadas_meta = :l,
+                    error_mensaje = :w
               WHERE id = :id',
-            ['c' => $campanias, 'a' => $adsets, 'an' => $anuncios, 's' => $snapshots, 'l' => $llamadas, 'id' => $id]
+            [
+                'c' => $campanias, 'a' => $adsets, 'an' => $anuncios, 's' => $snapshots,
+                'l' => $llamadas, 'id' => $id,
+                'w' => $warnings !== null ? mb_substr($warnings, 0, 5000) : null,
+            ]
         );
     }
 

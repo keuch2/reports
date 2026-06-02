@@ -3,11 +3,24 @@
 /** @var \MisterCo\Reports\Domain\Usuario $usuario */
 /** @var bool $tiene_token */
 /** @var list<array<string,mixed>> $cuentas */
+/** @var array<int,string|null> $ultimas_fechas */
+/** @var array<int, list<array<string,mixed>>> $campanias_por_cuenta */
 /** @var list<array<string,mixed>> $recientes */
 /** @var string $rango_inicio_default */
 /** @var string $rango_fin_default */
 /** @var string|null $error */
 /** @var string|null $success */
+
+// JSON con campañas por cuenta para el JS (id=meta_campaign_id para el filtering Meta).
+$campaniasJson = [];
+foreach ($campanias_por_cuenta as $cuentaId => $camps) {
+    $campaniasJson[$cuentaId] = array_map(static fn ($c) => [
+        'meta_id' => (string) $c['meta_campaign_id'],
+        'nombre' => (string) $c['nombre'],
+        'objetivo' => (string) ($c['objetivo'] ?? ''),
+        'estado' => (string) ($c['estado'] ?? ''),
+    ], $camps);
+}
 ?>
 <?= $view->renderPartial('partials/admin_header', ['usuario' => $usuario, 'seccion' => 'importar']) ?>
 
@@ -67,8 +80,22 @@
                                value="<?= $view->e($rango_fin_default) ?>" required>
                     </label>
                 </div>
-                <p class="muted">Se traen campañas, conjuntos, anuncios y métricas diarias a nivel anuncio.
-                    Puede tardar varios minutos según el volumen.</p>
+
+                <fieldset class="fieldset" id="campanias-fieldset" style="display:none">
+                    <legend>Campañas a importar</legend>
+                    <p class="muted" style="margin:0">
+                        <span id="campanias-modo">Toda la cuenta</span>
+                        — <button type="button" class="btn btn--link" id="btn-todas" style="padding:0">Marcar todas</button>
+                        / <button type="button" class="btn btn--link" id="btn-ninguna" style="padding:0">Ninguna</button>
+                    </p>
+                    <div id="campanias-lista" style="max-height:360px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius);padding:0.5rem"></div>
+                    <p class="muted" style="font-size:0.85rem;margin:0">
+                        Tip: si la cuenta es grande o falla por timeout, marcá solo las campañas que querés actualizar.
+                        Si no marcás ninguna, se importa la cuenta entera.
+                    </p>
+                </fieldset>
+
+                <p class="muted">Se traen campañas, conjuntos, anuncios y métricas diarias a nivel anuncio.</p>
                 <button type="submit" class="btn btn--primary" id="importar-btn">
                     Importar
                 </button>
@@ -89,9 +116,9 @@
                         <th>Rango</th>
                         <th>Inicio</th>
                         <th>Estado</th>
-                        <th>Campañas</th>
-                        <th>Anuncios</th>
-                        <th>Snapshots</th>
+                        <th class="num">Camp.</th>
+                        <th class="num">Anuncios</th>
+                        <th class="num">Snapshots</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -100,20 +127,20 @@
                         <td>#<?= (int) $r['id'] ?></td>
                         <td><?= $view->e((string) $r['cuenta_nombre']) ?></td>
                         <td><?= $view->e((string) $r['rango_inicio']) ?> → <?= $view->e((string) $r['rango_fin']) ?></td>
-                        <td><?= $view->e((string) $r['iniciado_en']) ?></td>
+                        <td><small><?= $view->e((string) $r['iniciado_en']) ?></small></td>
                         <td>
                             <span class="badge badge--<?= $view->e((string) $r['estado']) ?>">
                                 <?= $view->e((string) $r['estado']) ?>
                             </span>
-                            <?php if ($r['estado'] === 'fallida' && $r['error_mensaje']): ?>
-                                <details><summary>Ver error</summary>
-                                    <pre><?= $view->e((string) $r['error_mensaje']) ?></pre>
+                            <?php if (!empty($r['error_mensaje'])): ?>
+                                <details><summary><?= $r['estado'] === 'fallida' ? 'Ver error' : 'Ver aviso' ?></summary>
+                                    <pre style="white-space:pre-wrap;font-size:0.78rem;margin:0.25rem 0"><?= $view->e((string) $r['error_mensaje']) ?></pre>
                                 </details>
                             <?php endif; ?>
                         </td>
-                        <td><?= (int) $r['campanias_afectadas'] ?></td>
-                        <td><?= (int) $r['anuncios_afectados'] ?></td>
-                        <td><?= (int) $r['snapshots_afectados'] ?></td>
+                        <td class="num"><?= (int) $r['campanias_afectadas'] ?></td>
+                        <td class="num"><?= (int) $r['anuncios_afectados'] ?></td>
+                        <td class="num"><?= (int) $r['snapshots_afectados'] ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -123,30 +150,73 @@
 </section>
 
 <script>
-    document.getElementById('importar-form')?.addEventListener('submit', function () {
-        const btn = document.getElementById('importar-btn');
-        btn.disabled = true;
-        btn.textContent = 'Importando... no cierres esta ventana';
-    });
+const campaniasPorCuenta = <?= json_encode($campaniasJson, JSON_UNESCAPED_UNICODE) ?>;
+const cuentaSelect = document.getElementById('cuenta-select');
+const fieldset = document.getElementById('campanias-fieldset');
+const lista = document.getElementById('campanias-lista');
+const modoLabel = document.getElementById('campanias-modo');
 
-    // Importación incremental: precompletar "desde" con el día siguiente a la última fecha importada.
-    document.getElementById('btn-incremental')?.addEventListener('click', function () {
-        const select = document.getElementById('cuenta-select');
-        const opt = select.options[select.selectedIndex];
-        const hint = document.getElementById('incremental-hint');
-        if (!opt || !opt.value) { hint.textContent = 'Elegí una cuenta primero.'; return; }
-        const ultima = opt.dataset.ultima;
-        const inputDesde = document.querySelector('input[name="rango_inicio"]');
-        const inputHasta = document.querySelector('input[name="rango_fin"]');
-        const hoy = new Date().toISOString().slice(0, 10);
-        if (!ultima) {
-            hint.textContent = 'Esta cuenta no tiene datos previos; se importará el rango completo.';
-            return;
-        }
-        const d = new Date(ultima + 'T00:00:00');
-        d.setDate(d.getDate() + 1);
-        inputDesde.value = d.toISOString().slice(0, 10);
-        inputHasta.value = hoy;
-        hint.textContent = `Rango ajustado: ${inputDesde.value} → ${hoy}`;
-    });
+function renderCampanias(cuentaId) {
+    const camps = campaniasPorCuenta[cuentaId] || [];
+    if (camps.length === 0) {
+        fieldset.style.display = 'none';
+        return;
+    }
+    fieldset.style.display = '';
+    lista.innerHTML = camps.map(c => {
+        const obj = c.objetivo ? ` <small style="color:var(--color-muted)">· ${c.objetivo}</small>` : '';
+        const est = c.estado ? ` <small style="color:var(--color-muted)">· ${c.estado}</small>` : '';
+        return `<label style="display:flex;gap:0.5rem;align-items:flex-start;padding:0.25rem 0">
+            <input type="checkbox" name="campanias_meta_ids[]" value="${c.meta_id}">
+            <span><strong>${c.nombre}</strong>${obj}${est}</span>
+        </label>`;
+    }).join('');
+    actualizarModoLabel();
+}
+
+function actualizarModoLabel() {
+    const marcadas = lista.querySelectorAll('input[type=checkbox]:checked').length;
+    const total = lista.querySelectorAll('input[type=checkbox]').length;
+    modoLabel.textContent = marcadas === 0
+        ? `Toda la cuenta (${total} campañas conocidas)`
+        : `Solo ${marcadas} de ${total} campañas`;
+}
+
+cuentaSelect.addEventListener('change', () => renderCampanias(cuentaSelect.value));
+lista.addEventListener('change', actualizarModoLabel);
+
+document.getElementById('btn-todas').addEventListener('click', () => {
+    lista.querySelectorAll('input[type=checkbox]').forEach(c => c.checked = true);
+    actualizarModoLabel();
+});
+document.getElementById('btn-ninguna').addEventListener('click', () => {
+    lista.querySelectorAll('input[type=checkbox]').forEach(c => c.checked = false);
+    actualizarModoLabel();
+});
+
+document.getElementById('importar-form')?.addEventListener('submit', function () {
+    const btn = document.getElementById('importar-btn');
+    btn.disabled = true;
+    btn.textContent = 'Importando... no cierres esta ventana';
+});
+
+// Importación incremental: precompletar "desde" con el día siguiente a la última fecha importada.
+document.getElementById('btn-incremental')?.addEventListener('click', function () {
+    const opt = cuentaSelect.options[cuentaSelect.selectedIndex];
+    const hint = document.getElementById('incremental-hint');
+    if (!opt || !opt.value) { hint.textContent = 'Elegí una cuenta primero.'; return; }
+    const ultima = opt.dataset.ultima;
+    const inputDesde = document.querySelector('input[name="rango_inicio"]');
+    const inputHasta = document.querySelector('input[name="rango_fin"]');
+    const hoy = new Date().toISOString().slice(0, 10);
+    if (!ultima) {
+        hint.textContent = 'Esta cuenta no tiene datos previos; se importará el rango completo.';
+        return;
+    }
+    const d = new Date(ultima + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    inputDesde.value = d.toISOString().slice(0, 10);
+    inputHasta.value = hoy;
+    hint.textContent = `Rango ajustado: ${inputDesde.value} → ${hoy}`;
+});
 </script>

@@ -91,10 +91,19 @@ final class ImportacionService
     }
 
     /**
+     * Ejecuta una importación. Si $metaCampaignIdsFiltro está vacío, importa toda la cuenta.
+     * Si tiene valores, solo procesa esas campañas + sus adsets/ads/insights.
+     *
+     * @param list<string> $metaCampaignIdsFiltro IDs de campañas Meta a procesar (vacío = todas).
      * @return array{importacion_id:int, campanias:int, adsets:int, anuncios:int, snapshots:int}
      */
-    public function importar(int $cuentaId, string $rangoInicio, string $rangoFin, int $usuarioId): array
-    {
+    public function importar(
+        int $cuentaId,
+        string $rangoInicio,
+        string $rangoFin,
+        int $usuarioId,
+        array $metaCampaignIdsFiltro = [],
+    ): array {
         $cuenta = $this->cuentasRepo->buscarPorId($cuentaId);
         if ($cuenta === null) {
             throw new RuntimeException("Cuenta publicitaria {$cuentaId} no existe.");
@@ -103,20 +112,34 @@ final class ImportacionService
         $metaAccountId = (string) $cuenta['meta_account_id'];
         $importacionId = $this->importacionRepo->crear($cuentaId, $usuarioId, $rangoInicio, $rangoFin);
 
+        // Normalizamos el filtro a Set<string> para lookups rápidos.
+        $filtroActivo = $metaCampaignIdsFiltro !== [];
+        $filtroSet = array_flip(array_map('strval', $metaCampaignIdsFiltro));
+
         $cliente = $this->tokenService->cliente();
         $llamadas = 0;
         $campanias = 0;
         $adsets = 0;
         $anuncios = 0;
         $snapshots = 0;
+        $warnings = [];
 
         try {
-            // 1) Campañas
-            foreach ($cliente->paginar("act_{$metaAccountId}/campaigns", [
+            // 1) Campañas. Si hay filtro, usamos endpoint /campaigns con filtering server-side
+            //    (más eficiente que descargar todas y filtrar localmente).
+            $campaniasQuery = [
                 'fields' => ['id', 'name', 'objective', 'status', 'start_time', 'stop_time',
                              'daily_budget', 'lifetime_budget'],
                 'limit' => 100,
-            ]) as $c) {
+            ];
+            if ($filtroActivo) {
+                $campaniasQuery['filtering'] = json_encode([[
+                    'field' => 'campaign.id',
+                    'operator' => 'IN',
+                    'value' => array_keys($filtroSet),
+                ]]);
+            }
+            foreach ($cliente->paginar("act_{$metaAccountId}/campaigns", $campaniasQuery) as $c) {
                 $llamadas++;
                 $this->entidadesRepo->upsertCampania(
                     metaCampaignId: (string) $c['id'],
@@ -132,13 +155,25 @@ final class ImportacionService
                 $campanias++;
             }
 
-            // 2) Adsets — los traemos por cuenta (más eficiente que recorrer por campaña).
-            $mapaAdsetCampania = [];
-            foreach ($cliente->paginar("act_{$metaAccountId}/adsets", [
+            if ($filtroActivo && $campanias === 0) {
+                throw new RuntimeException('Las campañas seleccionadas no se encontraron en Meta. ¿Cambiaron de ID?');
+            }
+
+            // 2) Adsets — filtramos por las mismas campañas si hay filtro.
+            $adsetsQuery = [
                 'fields' => ['id', 'name', 'campaign_id', 'status', 'targeting',
                              'daily_budget', 'lifetime_budget', 'optimization_goal'],
                 'limit' => 100,
-            ]) as $a) {
+            ];
+            if ($filtroActivo) {
+                $adsetsQuery['filtering'] = json_encode([[
+                    'field' => 'campaign.id',
+                    'operator' => 'IN',
+                    'value' => array_keys($filtroSet),
+                ]]);
+            }
+            $mapaAdsetCampania = [];
+            foreach ($cliente->paginar("act_{$metaAccountId}/adsets", $adsetsQuery) as $a) {
                 $llamadas++;
                 $campaniaIdInterno = $this->entidadesRepo->buscarCampaniaPorMetaId((string) ($a['campaign_id'] ?? ''));
                 if ($campaniaIdInterno === null) {
@@ -161,15 +196,23 @@ final class ImportacionService
                 $adsets++;
             }
 
-            // 3) Ads + creative
+            // 3) Ads + creative — filtramos por las mismas campañas si hay filtro.
             $creativeFieldsExpr = 'creative{' . implode(',', self::CREATIVE_FIELDS) . '}';
-            foreach ($cliente->paginar("act_{$metaAccountId}/ads", [
+            $adsQuery = [
                 'fields' => [
-                    'id', 'name', 'adset_id', 'status', 'preview_shareable_link',
+                    'id', 'name', 'adset_id', 'campaign_id', 'status', 'preview_shareable_link',
                     $creativeFieldsExpr,
                 ],
                 'limit' => 100,
-            ]) as $ad) {
+            ];
+            if ($filtroActivo) {
+                $adsQuery['filtering'] = json_encode([[
+                    'field' => 'campaign.id',
+                    'operator' => 'IN',
+                    'value' => array_keys($filtroSet),
+                ]]);
+            }
+            foreach ($cliente->paginar("act_{$metaAccountId}/ads", $adsQuery) as $ad) {
                 $llamadas++;
                 $adsetIdInterno = $mapaAdsetCampania[(string) ($ad['adset_id'] ?? '')] ?? null;
                 if ($adsetIdInterno === null) {
@@ -229,14 +272,23 @@ final class ImportacionService
                 $anuncios++;
             }
 
-            // 4) Insights diarios a nivel ad
-            foreach ($cliente->paginar("act_{$metaAccountId}/insights", [
+            // 4) Insights diarios a nivel ad — filtramos por las mismas campañas si hay filtro.
+            $insightsQuery = [
                 'level' => 'ad',
                 'time_increment' => 1,
                 'time_range' => json_encode(['since' => $rangoInicio, 'until' => $rangoFin]),
                 'fields' => self::INSIGHTS_FIELDS,
                 'limit' => 250,
-            ]) as $i) {
+            ];
+            if ($filtroActivo) {
+                $insightsQuery['filtering'] = json_encode([[
+                    'field' => 'campaign.id',
+                    'operator' => 'IN',
+                    'value' => array_keys($filtroSet),
+                ]]);
+            }
+            $insightsAntes = $snapshots;
+            foreach ($cliente->paginar("act_{$metaAccountId}/insights", $insightsQuery) as $i) {
                 $llamadas++;
                 $metaAdId = (string) ($i['ad_id'] ?? '');
                 $adIdInterno = $this->entidadesRepo->buscarAnuncioPorMetaId($metaAdId);
@@ -286,8 +338,20 @@ final class ImportacionService
                 $snapshots++;
             }
 
+            // Si insights no devolvió nada y sí había ads, es probable que Meta no tenga
+            // datos para el rango (cuenta sin actividad, mala TZ) o que el token no tenga
+            // permisos sobre insights (devuelve data:[] en vez de 403 en algunas configs).
+            // Lo dejamos como warning en error_mensaje para que el admin lo vea sin marcar
+            // como "fallida".
+            if ($snapshots === $insightsAntes && $anuncios > 0) {
+                $warnings[] = "Meta no devolvió métricas para {$anuncios} anuncios en el rango {$rangoInicio} → {$rangoFin}. Posibles causas: la cuenta no tuvo actividad en este rango, los anuncios están desactivados, o el token no tiene permisos de insights sobre esta cuenta. Probá un rango anterior o revisá los permisos en Business Manager.";
+            }
+
             $this->cuentasRepo->marcarSincronizada($cuentaId);
-            $this->importacionRepo->marcarCompletada($importacionId, $campanias, $adsets, $anuncios, $snapshots, $llamadas);
+            $this->importacionRepo->marcarCompletada(
+                $importacionId, $campanias, $adsets, $anuncios, $snapshots, $llamadas,
+                $warnings === [] ? null : implode("\n\n", $warnings)
+            );
         } catch (Throwable $e) {
             $this->importacionRepo->marcarFallida($importacionId, $e->getMessage(), $llamadas);
             throw $e;

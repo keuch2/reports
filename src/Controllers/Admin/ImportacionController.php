@@ -11,6 +11,7 @@ use MisterCo\Reports\Core\Session;
 use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\CuentaPublicitariaRepository;
+use MisterCo\Reports\Repositories\EntidadesMetaRepository;
 use MisterCo\Reports\Repositories\ImportacionRepository;
 use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\Meta\ImportacionService;
@@ -30,13 +31,20 @@ final class ImportacionController
         $session = $this->container->get(Session::class);
         $cuentasRepo = $this->container->get(CuentaPublicitariaRepository::class);
         $importRepo = $this->container->get(ImportacionRepository::class);
+        $entidadesRepo = $this->container->get(EntidadesMetaRepository::class);
         $tokenService = $this->container->get(MetaTokenService::class);
 
         $cuentas = $cuentasRepo->listarTodas();
         // Mapa cuenta_id => última fecha importada (para sugerir incremental).
         $ultimasFechas = [];
+        $campaniasPorCuenta = [];
         foreach ($cuentas as $c) {
-            $ultimasFechas[(int) $c['id']] = $importRepo->ultimaFechaImportada((int) $c['id']);
+            $cid = (int) $c['id'];
+            $ultimasFechas[$cid] = $importRepo->ultimaFechaImportada($cid);
+            // Solo cargamos campañas si ya tiene alguna importada (evita N queries vacías).
+            if ($ultimasFechas[$cid] !== null) {
+                $campaniasPorCuenta[$cid] = $entidadesRepo->campaniasDeCuenta($cid);
+            }
         }
 
         return Response::html($view->render('admin/importar', [
@@ -45,6 +53,7 @@ final class ImportacionController
             'tiene_token' => $tokenService->tieneToken(),
             'cuentas' => $cuentas,
             'ultimas_fechas' => $ultimasFechas,
+            'campanias_por_cuenta' => $campaniasPorCuenta,
             'recientes' => $importRepo->recientes(15),
             'rango_inicio_default' => date('Y-m-d', strtotime('-30 days')),
             'rango_fin_default' => date('Y-m-d'),
@@ -63,6 +72,16 @@ final class ImportacionController
         $rangoInicio = (string) $request->input('rango_inicio', '');
         $rangoFin = (string) $request->input('rango_fin', '');
 
+        // Lista opcional de meta_campaign_id a importar. Si vacía → toda la cuenta.
+        $campaniasInput = $request->post['campanias_meta_ids'] ?? [];
+        if (!is_array($campaniasInput)) {
+            $campaniasInput = [];
+        }
+        $metaCampaignIds = array_values(array_filter(array_map(
+            static fn ($v) => trim((string) $v),
+            $campaniasInput
+        ), 'strlen'));
+
         if ($cuentaId <= 0 || !$this->validarFecha($rangoInicio) || !$this->validarFecha($rangoFin)) {
             $session->flash('error', 'Datos inválidos: revisá cuenta y rango.');
 
@@ -79,18 +98,31 @@ final class ImportacionController
         ignore_user_abort(true);
 
         $audit = $this->container->get(AuditService::class);
+        $detalles = [
+            'rango' => "{$rangoInicio} a {$rangoFin}",
+            'modo' => $metaCampaignIds === [] ? 'cuenta_entera' : 'selectivo',
+            'campanias_seleccionadas' => count($metaCampaignIds),
+        ];
         $audit->registrar('importacion.iniciada', $usuario, $request->ip, $request->userAgent,
-            'cuenta_publicitaria', (string) $cuentaId, ['rango' => "{$rangoInicio} a {$rangoFin}"]);
+            'cuenta_publicitaria', (string) $cuentaId, $detalles);
 
         try {
             $service = $this->container->get(ImportacionService::class);
-            $r = $service->importar($cuentaId, $rangoInicio, $rangoFin, $usuario->id);
+            $r = $service->importar($cuentaId, $rangoInicio, $rangoFin, $usuario->id, $metaCampaignIds);
             $audit->registrar('importacion.completada', $usuario, $request->ip, $request->userAgent,
                 'importacion', (string) $r['importacion_id'], $r);
-            $session->flash('success', sprintf(
-                'Importación #%d completada: %d campañas, %d adsets, %d anuncios, %d snapshots.',
-                $r['importacion_id'], $r['campanias'], $r['adsets'], $r['anuncios'], $r['snapshots']
-            ));
+
+            $modo = $metaCampaignIds === []
+                ? 'cuenta completa'
+                : count($metaCampaignIds) . ' campaña(s) seleccionada(s)';
+            $msg = sprintf(
+                'Importación #%d completada (%s): %d campañas, %d adsets, %d anuncios, %d snapshots.',
+                $r['importacion_id'], $modo, $r['campanias'], $r['adsets'], $r['anuncios'], $r['snapshots']
+            );
+            if ($r['snapshots'] === 0 && $r['anuncios'] > 0) {
+                $msg .= ' ⚠ Meta no devolvió métricas en este rango — revisá el detalle en histórico.';
+            }
+            $session->flash('success', $msg);
         } catch (MetaApiException $e) {
             $msg = $e->esTokenInvalido()
                 ? 'El token de Meta es inválido o expiró. Reconectá la cuenta.'
@@ -104,7 +136,7 @@ final class ImportacionController
             $session->flash('error', 'Fallo en la importación: ' . $e->getMessage());
         }
 
-        return Response::redirect('/admin/importar');
+        return Response::redirect('/admin/importaciones');
     }
 
     private function validarFecha(string $fecha): bool
