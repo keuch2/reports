@@ -307,6 +307,7 @@ final class DashboardService
                                          AND ms.fecha BETWEEN :desde AND :hasta
              WHERE cs.campania_id = :cam
           GROUP BY cs.id, cs.nombre, cs.estado, cs.optimization_goal, c.objetivo
+          HAVING SUM(ms.gasto) > 0 OR SUM(ms.impresiones) > 0
           ORDER BY gasto DESC",
             $params
         );
@@ -384,6 +385,7 @@ final class DashboardService
           GROUP BY a.id, a.nombre, a.tipo, a.thumbnail_url, a.image_url,
                    a.cuerpo, a.titulo, a.link_url, a.call_to_action, a.permalink_url, a.estado,
                    cs.id, cs.nombre, cs.optimization_goal, c.objetivo
+          HAVING SUM(ms.gasto) > 0 OR SUM(ms.impresiones) > 0
           ORDER BY gasto DESC",
             $params
         );
