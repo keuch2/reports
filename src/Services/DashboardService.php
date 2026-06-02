@@ -324,6 +324,7 @@ final class DashboardService
                 a.id, a.nombre, a.tipo, a.thumbnail_url, a.image_url,
                 a.cuerpo, a.titulo, a.link_url, a.call_to_action, a.permalink_url, a.estado,
                 cs.id AS adset_id, cs.nombre AS adset_nombre,
+                c.objetivo AS objetivo_campania,
                 COALESCE(SUM(ms.gasto), 0) AS gasto,
                 COALESCE(SUM(ms.impresiones), 0) AS impresiones,
                 COALESCE(SUM(ms.clicks_totales), 0) AS clicks,
@@ -331,28 +332,39 @@ final class DashboardService
                 COALESCE(SUM(ms.conversaciones), 0) AS conversaciones,
                 COALESCE(SUM(ms.landing_page_views), 0) AS landing_page_views,
                 COALESCE(SUM(ms.leads), 0) AS leads,
-                COALESCE(SUM(ms.resultados), 0) AS resultados,
+                CASE
+                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.resultados)
+                    WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN SUM(ms.leads)
+                    WHEN c.objetivo IN ('MESSAGES','OUTCOME_ENGAGEMENT') THEN SUM(ms.conversaciones)
+                    ELSE 0
+                END AS resultados,
                 CASE WHEN SUM(ms.impresiones) > 0
                      THEN SUM(ms.clicks_totales) / SUM(ms.impresiones) * 100
                      ELSE NULL END AS ctr,
                 CASE WHEN SUM(ms.clicks_totales) > 0
                      THEN SUM(ms.gasto) / SUM(ms.clicks_totales)
                      ELSE NULL END AS cpc,
-                CASE WHEN SUM(ms.resultados) > 0
-                     THEN SUM(ms.gasto) / SUM(ms.resultados)
-                     ELSE NULL END AS costo_por_resultado,
+                CASE
+                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.gasto) / SUM(ms.resultados)
+                    WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') AND SUM(ms.leads) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.leads)
+                    WHEN c.objetivo IN ('MESSAGES','OUTCOME_ENGAGEMENT') AND SUM(ms.conversaciones) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.conversaciones)
+                    ELSE NULL
+                END AS costo_por_resultado,
                 CASE WHEN SUM(ms.conversaciones) > 0
                      THEN SUM(ms.gasto) / SUM(ms.conversaciones)
                      ELSE NULL END AS costo_por_conversacion
               FROM anuncios a
               JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
+              JOIN campanias c ON c.id = cs.campania_id
          LEFT JOIN metricas_snapshots ms ON ms.entidad_id = a.id AND ms.nivel = 'ad'
                                          AND ms.fecha BETWEEN :desde AND :hasta
              WHERE cs.campania_id = :cam
                {$exclAnunciosSql}
           GROUP BY a.id, a.nombre, a.tipo, a.thumbnail_url, a.image_url,
                    a.cuerpo, a.titulo, a.link_url, a.call_to_action, a.permalink_url, a.estado,
-                   cs.id, cs.nombre
+                   cs.id, cs.nombre, c.objetivo
           ORDER BY gasto DESC",
             $params
         );

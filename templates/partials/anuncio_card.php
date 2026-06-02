@@ -9,6 +9,21 @@
 /** @var bool $ocultarConversaciones */
 /** @var bool $ocultarLeads */
 
+use MisterCo\Reports\Domain\ObjetivoCampania;
+
+// Mostramos una sola "métrica de resultado" según el objetivo de la campaña padre,
+// para no duplicar (ej. en OUTCOME_LEADS no tiene sentido mostrar conversaciones).
+$objetivoAd = strtoupper((string) ($a['objetivo_campania'] ?? ''));
+$esLeads = in_array($objetivoAd, ['OUTCOME_LEADS', 'LEAD_GENERATION'], true);
+$esMensajes = in_array($objetivoAd, ['MESSAGES', 'OUTCOME_ENGAGEMENT'], true);
+
+// Reglas:
+// - Si la campaña optimiza por LEADS → ocultar conversaciones (no relevantes).
+// - Si optimiza por MENSAJES → ocultar leads (no relevantes).
+// - Si no es ninguno (tráfico, awareness, etc.) → respetamos el flag de la campaña.
+$mostrarConversaciones = !$esLeads && !($ocultarConversaciones ?? false);
+$mostrarLeads = !$esMensajes && !($ocultarLeads ?? false);
+
 $thumb = (string) ($a['image_url'] ?? $a['thumbnail_url'] ?? '');
 $cuerpo = (string) ($a['cuerpo'] ?? '');
 $titulo = (string) ($a['titulo'] ?? '');
@@ -88,7 +103,7 @@ $labelCortoLower = mb_strtolower($labelResultadosCorto ?? 'resultado');
                         <?php endif; ?>
                     </tr>
                 <?php endif; ?>
-                <?php if (((int) ($a['conversaciones'] ?? 0)) > 0 && !($ocultarConversaciones ?? false)): ?>
+                <?php if (((int) ($a['conversaciones'] ?? 0)) > 0 && $mostrarConversaciones): ?>
                     <tr>
                         <th>Conversaciones</th>
                         <td><?= $fmtNum($a['conversaciones']) ?></td>
@@ -100,7 +115,7 @@ $labelCortoLower = mb_strtolower($labelResultadosCorto ?? 'resultado');
                         <?php endif; ?>
                     </tr>
                 <?php endif; ?>
-                <?php if (((int) ($a['leads'] ?? 0)) > 0 && !($ocultarLeads ?? false)): ?>
+                <?php if (((int) ($a['leads'] ?? 0)) > 0 && $mostrarLeads): ?>
                     <tr>
                         <th>Leads</th>
                         <td><?= $fmtNum($a['leads']) ?></td>
