@@ -170,6 +170,25 @@ final class EntidadesMetaRepository
         );
     }
 
+    /**
+     * Optimization_goal más usado entre los adsets de una campaña. Permite que
+     * los textos descriptivos (análisis) usen la métrica de resultado correcta
+     * cuando una campaña tiene varios adsets con distintos goals.
+     */
+    public function optimizationGoalPredominante(int $campaniaId): ?string
+    {
+        $row = $this->db->selectOne(
+            'SELECT optimization_goal, COUNT(*) AS n
+               FROM conjuntos_anuncios
+              WHERE campania_id = :c AND optimization_goal IS NOT NULL
+           GROUP BY optimization_goal
+           ORDER BY n DESC
+              LIMIT 1',
+            ['c' => $campaniaId]
+        );
+        return $row !== null ? (string) $row['optimization_goal'] : null;
+    }
+
     /** @return list<array<string,mixed>> Todos los anuncios de una campaña con su adset */
     public function anunciosDeCampania(int $campaniaId): array
     {

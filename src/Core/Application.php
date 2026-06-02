@@ -17,6 +17,7 @@ use MisterCo\Reports\Repositories\UsuarioRepository;
 use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\AuthService;
 use MisterCo\Reports\Services\DashboardPreferenciasService;
+use MisterCo\Reports\Services\AnalisisCampaniaService;
 use MisterCo\Reports\Services\DashboardService;
 use MisterCo\Reports\Services\Meta\ImportacionService;
 use MisterCo\Reports\Services\Meta\MetaTokenService;
@@ -106,6 +107,7 @@ final class Application
             $c->get(PermisosService::class),
         ));
         $container->bind(DashboardPreferenciasService::class, fn (Container $c) => new DashboardPreferenciasService($c->get(Database::class)));
+        $container->bind(AnalisisCampaniaService::class, fn () => new AnalisisCampaniaService());
         $container->bind(ReportePdfService::class, fn (Container $c) => new ReportePdfService(
             $c->get(View::class),
             $c->get(DashboardService::class),

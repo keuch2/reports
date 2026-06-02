@@ -10,6 +10,7 @@ use MisterCo\Reports\Core\Response;
 use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\EntidadesMetaRepository;
+use MisterCo\Reports\Services\AnalisisCampaniaService;
 use MisterCo\Reports\Services\DashboardService;
 
 final class CampaniaController
@@ -52,6 +53,21 @@ final class CampaniaController
             $anunciosPorAdset[(int) $a['adset_id']][] = $a;
         }
 
+        $analisisService = $this->container->get(AnalisisCampaniaService::class);
+        [$prevDesde, $prevHasta] = $analisisService->rangoAnterior($desde, $hasta);
+        $totalesPrevios = $dashboard->totalesCampania($clienteId, $campaniaId, $prevDesde, $prevHasta);
+        $campaniaConGoal = $cam + [
+            'optimization_goal_predominante' => $entidades->optimizationGoalPredominante($campaniaId),
+        ];
+        $analisis = $analisisService->generar(
+            $totales,
+            $campaniaConGoal,
+            $totalesPrevios,
+            (string) ($cam['moneda'] ?? ''),
+            $desde,
+            $hasta,
+        );
+
         $view = $this->container->get(View::class);
 
         return Response::html($view->render('cliente/campania_detalle', [
@@ -64,6 +80,7 @@ final class CampaniaController
             'desde' => $desde,
             'hasta' => $hasta,
             'preset' => $preset,
+            'analisis' => $analisis,
         ]));
     }
 

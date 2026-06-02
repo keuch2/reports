@@ -57,6 +57,10 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
         <span class="muted" style="align-self:center"><?= $view->e($desde) ?> → <?= $view->e($hasta) ?></span>
     </form>
 
+    <?php if (!empty($analisis ?? '')): ?>
+        <p class="campania-analisis"><?= $view->e($analisis) ?></p>
+    <?php endif; ?>
+
     <div class="kpi-grid">
         <div class="kpi"><span class="kpi__label">Gasto</span><span class="kpi__value"><?= $view->e($mon) ?> <?= $fmtMoneda($totales['gasto'] ?? 0) ?></span></div>
         <div class="kpi"><span class="kpi__label">Impresiones</span><span class="kpi__value"><?= $fmtNum($totales['impresiones'] ?? 0) ?></span></div>

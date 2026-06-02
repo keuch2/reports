@@ -197,10 +197,22 @@ final class DashboardService
                 COALESCE(SUM(ms.conversaciones), 0) AS conversaciones,
                 COALESCE(SUM(ms.landing_page_views), 0) AS landing_page_views,
                 COALESCE(SUM(ms.leads), 0) AS leads,
+                -- Aplica la misma jerarquía que adsetsDeCampaniaConMetricas:
+                -- optimization_goal predominante del adset gana sobre objective.
+                -- Como no podemos elegir un optimization_goal único en SUM, sumamos
+                -- por la métrica que más usen los adsets activos: si la mayoría
+                -- optimiza CONVERSATIONS sumamos conversaciones, si LEAD_GEN leads,
+                -- etc. Caemos al objective si no hay un goal dominante.
                 CASE
-                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.resultados)
+                    WHEN COALESCE((SELECT GROUP_CONCAT(DISTINCT cs2.optimization_goal)
+                                   FROM conjuntos_anuncios cs2
+                                  WHERE cs2.campania_id = c.id), '') LIKE '%CONVERSATIONS%' THEN SUM(ms.conversaciones)
+                    WHEN COALESCE((SELECT GROUP_CONCAT(DISTINCT cs2.optimization_goal)
+                                   FROM conjuntos_anuncios cs2
+                                  WHERE cs2.campania_id = c.id), '') LIKE '%LEAD_GENERATION%' THEN SUM(ms.leads)
                     WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN SUM(ms.leads)
                     WHEN c.objetivo IN ('MESSAGES','OUTCOME_ENGAGEMENT') THEN SUM(ms.conversaciones)
+                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.resultados)
                     ELSE 0
                 END AS resultados,
                 CASE WHEN SUM(ms.impresiones) > 0
@@ -213,11 +225,19 @@ final class DashboardService
                      THEN SUM(ms.gasto) / SUM(ms.impresiones) * 1000
                      ELSE NULL END AS cpm,
                 CASE
-                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.gasto) / SUM(ms.resultados)
+                    WHEN COALESCE((SELECT GROUP_CONCAT(DISTINCT cs2.optimization_goal)
+                                   FROM conjuntos_anuncios cs2
+                                  WHERE cs2.campania_id = c.id), '') LIKE '%CONVERSATIONS%' AND SUM(ms.conversaciones) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.conversaciones)
+                    WHEN COALESCE((SELECT GROUP_CONCAT(DISTINCT cs2.optimization_goal)
+                                   FROM conjuntos_anuncios cs2
+                                  WHERE cs2.campania_id = c.id), '') LIKE '%LEAD_GENERATION%' AND SUM(ms.leads) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.leads)
                     WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') AND SUM(ms.leads) > 0
                         THEN SUM(ms.gasto) / SUM(ms.leads)
                     WHEN c.objetivo IN ('MESSAGES','OUTCOME_ENGAGEMENT') AND SUM(ms.conversaciones) > 0
                         THEN SUM(ms.gasto) / SUM(ms.conversaciones)
+                    WHEN SUM(ms.resultados) > 0 THEN SUM(ms.gasto) / SUM(ms.resultados)
                     ELSE NULL
                 END AS costo_por_resultado,
                 CASE WHEN SUM(ms.conversaciones) > 0
@@ -230,7 +250,7 @@ final class DashboardService
              WHERE cs.campania_id = :cam
                AND ms.fecha BETWEEN :desde AND :hasta
                {$exclAnunciosSql}
-             GROUP BY c.objetivo",
+             GROUP BY c.id, c.objetivo",
             $params
         );
 

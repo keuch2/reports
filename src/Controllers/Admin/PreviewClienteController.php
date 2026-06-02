@@ -10,6 +10,7 @@ use MisterCo\Reports\Core\Response;
 use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Repositories\ClienteRepository;
 use MisterCo\Reports\Repositories\EntidadesMetaRepository;
+use MisterCo\Reports\Services\AnalisisCampaniaService;
 use MisterCo\Reports\Services\DashboardPreferenciasService;
 use MisterCo\Reports\Services\DashboardService;
 use MisterCo\Reports\Services\PermisosService;
@@ -116,6 +117,21 @@ final class PreviewClienteController
             $anunciosPorAdset[(int) $a['adset_id']][] = $a;
         }
 
+        $analisisService = $this->container->get(AnalisisCampaniaService::class);
+        [$prevDesde, $prevHasta] = $analisisService->rangoAnterior($desde, $hasta);
+        $totalesPrevios = $service->totalesCampania($clienteId, $campaniaId, $prevDesde, $prevHasta);
+        $campaniaConGoal = $cam + [
+            'optimization_goal_predominante' => $entidades->optimizationGoalPredominante($campaniaId),
+        ];
+        $analisis = $analisisService->generar(
+            $totales,
+            $campaniaConGoal,
+            $totalesPrevios,
+            (string) ($cam['moneda'] ?? ''),
+            $desde,
+            $hasta,
+        );
+
         $view = $this->container->get(View::class);
 
         return Response::html($view->render('admin/preview_campania', [
@@ -129,6 +145,7 @@ final class PreviewClienteController
             'desde' => $desde,
             'hasta' => $hasta,
             'preset' => $preset,
+            'analisis' => $analisis,
         ]));
     }
 
