@@ -157,7 +157,11 @@ final class AnalisisCampaniaService
 
     private function formatoMoneda(string $moneda, float $valor): string
     {
-        return trim($moneda . ' ' . number_format($valor, 2, ',', '.'));
+        // PYG no usa decimales; redondeamos hacia arriba al guaraní entero.
+        $numero = $moneda === 'PYG'
+            ? number_format(ceil($valor), 0, ',', '.')
+            : number_format($valor, 2, ',', '.');
+        return trim($moneda . ' ' . $numero);
     }
 
     private function formatoNumero(int|float $valor): string

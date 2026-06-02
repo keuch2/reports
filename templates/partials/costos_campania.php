@@ -16,7 +16,10 @@ $subtotal = $gasto + $comision;
 $iva = $subtotal * $IVA_PCT;
 $total = $subtotal + $iva;
 
-$fmt = static fn (float $v) => number_format($v, 2, ',', '.');
+// PYG no usa decimales; redondeamos hacia arriba al guaraní entero.
+$fmt = fn (float $v) => $mon === 'PYG'
+    ? number_format(ceil($v), 0, ',', '.')
+    : number_format($v, 2, ',', '.');
 ?>
 <article class="card" style="margin-top:1.5rem">
     <h2>Costos del período</h2>

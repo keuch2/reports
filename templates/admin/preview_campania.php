@@ -21,7 +21,10 @@ $labelCostoPorResultado = 'Costo por ' . mb_strtolower($labelResultadosCorto);
 $ocultarConversaciones = ObjetivoCampania::conversacionesEsRedundante($objetivo);
 $ocultarLeads = ObjetivoCampania::leadsEsRedundante($objetivo);
 
-$fmtMoneda = static fn ($v) => number_format((float) $v, 2, ',', '.');
+// PYG no usa decimales; redondeamos hacia arriba al guaraní entero.
+$fmtMoneda = fn ($v) => $mon === 'PYG'
+    ? number_format((float) ceil((float) $v), 0, ',', '.')
+    : number_format((float) $v, 2, ',', '.');
 $fmtNum = static fn ($v) => number_format((float) $v, 0, ',', '.');
 $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, ',', '.') . '%';
 ?>
