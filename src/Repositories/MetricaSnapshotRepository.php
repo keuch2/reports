@@ -38,16 +38,17 @@ final class MetricaSnapshotRepository
         ?int $landingPageViews = null,
         ?int $leads = null,
         ?float $costoPorConversacion = null,
+        ?int $interacciones = null,
         array $metricasExtendidas = [],
     ): void {
         $this->db->execute(
             'INSERT INTO metricas_snapshots
                 (nivel, entidad_id, meta_entidad_id, fecha, gasto, impresiones, alcance, frecuencia,
                  clicks_totales, clicks_enlace, ctr, cpc, cpm, costo_por_resultado, resultados, conversiones,
-                 conversaciones, landing_page_views, leads, costo_por_conversacion, metricas_extendidas)
+                 conversaciones, landing_page_views, leads, interacciones, costo_por_conversacion, metricas_extendidas)
               VALUES
                 (:n, :eid, :mid, :f, :g, :imp, :alc, :fr, :ct, :ce, :ctr, :cpc, :cpm, :cpr, :res, :con,
-                 :conv, :lpv, :lds, :cpconv, :ext)
+                 :conv, :lpv, :lds, :inter, :cpconv, :ext)
               ON DUPLICATE KEY UPDATE
                 meta_entidad_id = VALUES(meta_entidad_id),
                 gasto = VALUES(gasto),
@@ -65,6 +66,7 @@ final class MetricaSnapshotRepository
                 conversaciones = VALUES(conversaciones),
                 landing_page_views = VALUES(landing_page_views),
                 leads = VALUES(leads),
+                interacciones = VALUES(interacciones),
                 costo_por_conversacion = VALUES(costo_por_conversacion),
                 metricas_extendidas = VALUES(metricas_extendidas),
                 importado_en = NOW()',
@@ -75,7 +77,7 @@ final class MetricaSnapshotRepository
                 'ctr' => $ctr, 'cpc' => $cpc, 'cpm' => $cpm, 'cpr' => $costoPorResultado,
                 'res' => $resultados, 'con' => $conversiones,
                 'conv' => $conversaciones, 'lpv' => $landingPageViews,
-                'lds' => $leads, 'cpconv' => $costoPorConversacion,
+                'lds' => $leads, 'inter' => $interacciones, 'cpconv' => $costoPorConversacion,
                 'ext' => $metricasExtendidas === [] ? null : json_encode($metricasExtendidas, JSON_UNESCAPED_UNICODE),
             ]
         );

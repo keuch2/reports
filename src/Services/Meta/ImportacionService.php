@@ -59,6 +59,14 @@ final class ImportacionService
             'leadgen.other',
             'onsite_conversion.lead_grouped',
         ],
+        // Interacciones (engagement): el campo post_engagement de Meta ya suma
+        // reactions + comments + shares + post_save + post_view. Pero en algunos
+        // setups vienen los componentes sueltos.
+        'interacciones' => [
+            'post_engagement', 'page_engagement',
+            'post_reaction', 'like',
+            'comment', 'post_save', 'post',
+        ],
     ];
 
     /**
@@ -329,6 +337,10 @@ final class ImportacionService
                 $conversaciones = $this->sumarActions($actions, self::ACTION_TYPES['conversaciones']);
                 $landingViews = $this->sumarActions($actions, self::ACTION_TYPES['landing_page_views']);
                 $leads = $this->sumarActions($actions, self::ACTION_TYPES['leads']);
+                // Para interacciones priorizamos el agregado post_engagement de Meta
+                // si está presente; si no, sumamos los componentes.
+                $interacciones = $this->primerValorAction($actions, ['post_engagement', 'page_engagement'])
+                    ?? $this->sumarActions($actions, ['post_reaction', 'like', 'comment', 'post_save', 'post']);
                 $costoPorConv = $this->primerCostoPorAction($costPerAction, self::COST_ACTION_TYPES_CONVERSACION);
 
                 // Resultados: Meta no siempre devuelve el campo `results` (depende del setup
@@ -338,7 +350,7 @@ final class ImportacionService
                     : null;
                 if ($resultadosBruto === null || $resultadosBruto === 0) {
                     $objCampania = $objetivoPorCampania[(string) ($i['campaign_id'] ?? '')] ?? null;
-                    $resultadosBruto = $this->resultadosSegunObjetivo($objCampania, $leads, $conversaciones, $landingViews);
+                    $resultadosBruto = $this->resultadosSegunObjetivo($objCampania, $leads, $conversaciones, $landingViews, $interacciones);
                 }
 
                 // Guardamos los arrays raw en metricas_extendidas para no perder nada.
@@ -369,6 +381,7 @@ final class ImportacionService
                     landingPageViews: $landingViews,
                     leads: $leads,
                     costoPorConversacion: $costoPorConv,
+                    interacciones: $interacciones,
                     metricasExtendidas: $extendidas,
                 );
                 $snapshots++;
@@ -426,15 +439,37 @@ final class ImportacionService
      * Devuelve la métrica de "resultados" apropiada según el objetivo de la campaña.
      * Replica la lógica de la columna "Resultados" de Meta Ads Manager.
      */
-    private function resultadosSegunObjetivo(?string $objetivo, ?int $leads, ?int $conversaciones, ?int $landingViews): ?int
+    private function resultadosSegunObjetivo(?string $objetivo, ?int $leads, ?int $conversaciones, ?int $landingViews, ?int $interacciones = null): ?int
     {
         $obj = strtoupper((string) $objetivo);
         return match ($obj) {
             'OUTCOME_LEADS', 'LEAD_GENERATION' => $leads,
-            'MESSAGES', 'OUTCOME_ENGAGEMENT' => $conversaciones,
+            'MESSAGES' => $conversaciones,
+            // OUTCOME_ENGAGEMENT / POST_ENGAGEMENT pueden ser de mensajes (WA) o
+            // de interacciones puras (reactions, comments). Si no hay conversaciones,
+            // cae a interacciones.
+            'OUTCOME_ENGAGEMENT', 'POST_ENGAGEMENT', 'PAGE_LIKES', 'EVENT_RESPONSES'
+                => ($conversaciones !== null && $conversaciones > 0) ? $conversaciones : $interacciones,
             'OUTCOME_TRAFFIC', 'LINK_CLICKS' => $landingViews,
             default => null,
         };
+    }
+
+    /**
+     * Devuelve el primer valor de un action_type específico (no suma, no falla si
+     * no existe). Útil para campos que Meta ya entrega agregados como post_engagement.
+     *
+     * @param list<array<string,mixed>> $actions
+     * @param list<string> $tiposBuscados
+     */
+    private function primerValorAction(array $actions, array $tiposBuscados): ?int
+    {
+        foreach ($actions as $a) {
+            if (in_array((string) ($a['action_type'] ?? ''), $tiposBuscados, true)) {
+                return (int) ($a['value'] ?? 0);
+            }
+        }
+        return null;
     }
 
     /**
