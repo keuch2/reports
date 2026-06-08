@@ -334,9 +334,12 @@ final class ImportacionService
                 $actions = is_array($i['actions'] ?? null) ? $i['actions'] : [];
                 $costPerAction = is_array($i['cost_per_action_type'] ?? null) ? $i['cost_per_action_type'] : [];
 
-                $conversaciones = $this->sumarActions($actions, self::ACTION_TYPES['conversaciones']);
+                // Conversaciones y leads se reportan en varios action_types que
+                // son aliases del mismo evento (diferentes ventanas de atribución).
+                // Tomamos el primero por orden de prioridad para no duplicar.
+                $conversaciones = $this->primerMatchAction($actions, self::ACTION_TYPES['conversaciones']);
+                $leads = $this->primerMatchAction($actions, self::ACTION_TYPES['leads']);
                 $landingViews = $this->sumarActions($actions, self::ACTION_TYPES['landing_page_views']);
-                $leads = $this->sumarActions($actions, self::ACTION_TYPES['leads']);
                 // Para interacciones priorizamos el agregado post_engagement de Meta
                 // si está presente; si no, sumamos los componentes.
                 $interacciones = $this->primerValorAction($actions, ['post_engagement', 'page_engagement'])
@@ -433,6 +436,33 @@ final class ImportacionService
         }
 
         return $encontrado ? $total : null;
+    }
+
+    /**
+     * Busca el primer action_type presente en `actions` siguiendo el orden de
+     * `tiposBuscados`. Útil cuando varios action_types representan EL MISMO
+     * evento (ej. conversaciones de WhatsApp con distintas ventanas de
+     * atribución) y sumarlos sería duplicar.
+     *
+     * @param list<array<string,mixed>> $actions
+     * @param list<string> $tiposBuscados
+     */
+    private function primerMatchAction(array $actions, array $tiposBuscados): ?int
+    {
+        // Indexamos las actions por type para lookup O(1).
+        $index = [];
+        foreach ($actions as $a) {
+            $tipo = (string) ($a['action_type'] ?? '');
+            if ($tipo !== '') {
+                $index[$tipo] = (int) ($a['value'] ?? 0);
+            }
+        }
+        foreach ($tiposBuscados as $tipo) {
+            if (isset($index[$tipo])) {
+                return $index[$tipo];
+            }
+        }
+        return null;
     }
 
     /**
