@@ -91,12 +91,27 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
         <?php endforeach; ?>
     </div>
 
+    <?php if (!empty($resultados_por_tipo ?? [])): ?>
+        <?= $view->renderPartial('partials/resultados_por_tipo', [
+            'resultados_por_tipo' => $resultados_por_tipo,
+            'mon' => $moneda,
+            'fmtMoneda' => $fmtMoneda,
+            'fmtNum' => $fmtNum,
+        ]) ?>
+    <?php endif; ?>
 
     <article class="card" style="margin-top:1.5rem">
         <h2>Campañas (<?= count($campanias) ?>)</h2>
         <?php if ($campanias === []): ?>
             <p class="muted">No hay datos para el rango <?= $view->e($desde) ?> → <?= $view->e($hasta) ?>.</p>
         <?php else: ?>
+            <?php
+            $sumColumna = static fn (string $k): int => (int) array_sum(array_map(static fn ($c) => (int) ($c[$k] ?? 0), $campanias));
+            $colConv = $sumColumna('conversaciones') > 0;
+            $colLeads = $sumColumna('leads') > 0;
+            $colInter = $sumColumna('interacciones') > 0;
+            $colVisit = $sumColumna('visitas') > 0;
+            ?>
             <table class="table">
                 <thead>
                     <tr>
@@ -108,6 +123,10 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
                         <th class="num">Clicks</th>
                         <th class="num">CTR</th>
                         <th class="num">CPC</th>
+                        <?php if ($colConv): ?><th class="num">Conversaciones</th><?php endif; ?>
+                        <?php if ($colLeads): ?><th class="num">Clientes pot.</th><?php endif; ?>
+                        <?php if ($colInter): ?><th class="num">Interacciones</th><?php endif; ?>
+                        <?php if ($colVisit): ?><th class="num">Visitas</th><?php endif; ?>
                     </tr>
                 </thead>
                 <tbody>
@@ -125,6 +144,10 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
                         <td class="num"><?= $fmtNum($c['clicks']) ?></td>
                         <td class="num"><?= $fmtPct($c['ctr']) ?></td>
                         <td class="num"><?= $c['cpc'] !== null ? $fmtMoneda($c['cpc']) : '—' ?></td>
+                        <?php if ($colConv): ?><td class="num"><?= ((int) ($c['conversaciones'] ?? 0)) > 0 ? $fmtNum($c['conversaciones']) : '—' ?></td><?php endif; ?>
+                        <?php if ($colLeads): ?><td class="num"><?= ((int) ($c['leads'] ?? 0)) > 0 ? $fmtNum($c['leads']) : '—' ?></td><?php endif; ?>
+                        <?php if ($colInter): ?><td class="num"><?= ((int) ($c['interacciones'] ?? 0)) > 0 ? $fmtNum($c['interacciones']) : '—' ?></td><?php endif; ?>
+                        <?php if ($colVisit): ?><td class="num"><?= ((int) ($c['visitas'] ?? 0)) > 0 ? $fmtNum($c['visitas']) : '—' ?></td><?php endif; ?>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

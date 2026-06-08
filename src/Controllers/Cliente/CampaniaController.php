@@ -66,6 +66,9 @@ final class CampaniaController
         $campaniaConGoal = $cam + [
             'optimization_goal_predominante' => $optGoalPredominante,
         ];
+        $evolucion = $dashboard->evolucionDiariaCampania($clienteId, $campaniaId, $desde, $hasta);
+        $resultadosPorTipo = $dashboard->resultadosPorTipoCampania($clienteId, $campaniaId, $desde, $hasta);
+
         $analisis = $analisisService->generar(
             $totales,
             $campaniaConGoal,
@@ -73,9 +76,8 @@ final class CampaniaController
             (string) ($cam['moneda'] ?? ''),
             $desde,
             $hasta,
+            $resultadosPorTipo,
         );
-
-        $evolucion = $dashboard->evolucionDiariaCampania($clienteId, $campaniaId, $desde, $hasta);
 
         $view = $this->container->get(View::class);
 
@@ -92,6 +94,7 @@ final class CampaniaController
             'meses_disponibles' => $mesesDisponibles,
             'analisis' => $analisis,
             'evolucion' => $evolucion,
+            'resultados_por_tipo' => $resultadosPorTipo,
         ]));
     }
 

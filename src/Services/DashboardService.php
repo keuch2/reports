@@ -99,6 +99,117 @@ final class DashboardService
     }
 
     /**
+     * Agrega los resultados por TIPO (conversaciones, leads, interacciones,
+     * visitas a destino) clasificando cada adset por su optimization_goal o
+     * por el objetivo de su campaña. Cada fila trae cantidad + gasto asociado
+     * + costo por unidad. Permite mostrar varios KPIs cuando el cliente tiene
+     * mezcla de objetivos.
+     *
+     * @return list<array{tipo:string, cantidad:int, gasto:float, costo:?float}>
+     */
+    public function resultadosPorTipoGlobal(int $clienteId, string $desde, string $hasta): array
+    {
+        $idsCampanias = $this->idsCampaniasAsignadas($clienteId);
+        if ($idsCampanias === []) {
+            return [];
+        }
+        [$camsPlaceholders, $camsParams] = $this->placeholders($idsCampanias, 'cam');
+        [$exclAnunciosSql, $anunciosParams] = $this->fragmentoAnunciosOcultosGlobal($clienteId);
+
+        return $this->ejecutarResultadosPorTipo(
+            "cs.campania_id IN ({$camsPlaceholders}) {$exclAnunciosSql}",
+            array_merge(['desde' => $desde, 'hasta' => $hasta], $camsParams, $anunciosParams)
+        );
+    }
+
+    /**
+     * Igual que resultadosPorTipoGlobal pero acotado a una sola campaña.
+     *
+     * @return list<array{tipo:string, cantidad:int, gasto:float, costo:?float}>
+     */
+    public function resultadosPorTipoCampania(int $clienteId, int $campaniaId, string $desde, string $hasta): array
+    {
+        $this->asegurarAccesoCampania($clienteId, $campaniaId);
+        $params = ['cam' => $campaniaId, 'desde' => $desde, 'hasta' => $hasta];
+        $exclAnunciosSql = '';
+        $ocultos = $this->permisos->anunciosOcultosDeCampania($clienteId, $campaniaId);
+        if ($ocultos !== []) {
+            [$ph, $exclParams] = $this->placeholders($ocultos, 'exc_a');
+            $exclAnunciosSql = "AND a.id NOT IN ({$ph})";
+            $params = array_merge($params, $exclParams);
+        }
+
+        return $this->ejecutarResultadosPorTipo(
+            "cs.campania_id = :cam {$exclAnunciosSql}",
+            $params
+        );
+    }
+
+    /**
+     * Clasifica cada adset por su optimization_goal (o el objetivo de la
+     * campaña si está vacío), agrega gasto y la métrica correspondiente,
+     * y devuelve una fila por cada tipo con datos.
+     *
+     * @param array<string,mixed> $params
+     * @return list<array{tipo:string, cantidad:int, gasto:float, costo:?float}>
+     */
+    private function ejecutarResultadosPorTipo(string $whereExtra, array $params): array
+    {
+        $rows = $this->db->select(
+            "SELECT
+                CASE
+                    WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') THEN 'conversaciones'
+                    WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') THEN 'leads'
+                    WHEN cs.optimization_goal IN ('POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN 'interacciones'
+                    WHEN cs.optimization_goal IN ('LANDING_PAGE_VIEWS','LINK_CLICKS') THEN 'visitas'
+                    WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN 'leads'
+                    WHEN c.objetivo = 'MESSAGES' THEN 'conversaciones'
+                    WHEN c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN 'interacciones'
+                    WHEN c.objetivo IN ('OUTCOME_TRAFFIC','LINK_CLICKS') THEN 'visitas'
+                    ELSE 'otros'
+                END AS tipo,
+                SUM(ms.gasto) AS gasto,
+                SUM(CASE
+                    WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') THEN ms.conversaciones
+                    WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') THEN ms.leads
+                    WHEN cs.optimization_goal IN ('POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN ms.interacciones
+                    WHEN cs.optimization_goal IN ('LANDING_PAGE_VIEWS','LINK_CLICKS') THEN ms.landing_page_views
+                    WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN ms.leads
+                    WHEN c.objetivo = 'MESSAGES' THEN ms.conversaciones
+                    WHEN c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN ms.interacciones
+                    WHEN c.objetivo IN ('OUTCOME_TRAFFIC','LINK_CLICKS') THEN ms.landing_page_views
+                    ELSE 0
+                END) AS cantidad
+              FROM metricas_snapshots ms
+              JOIN anuncios a ON a.id = ms.entidad_id AND ms.nivel = 'ad'
+              JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
+              JOIN campanias c ON c.id = cs.campania_id
+             WHERE {$whereExtra}
+               AND ms.fecha BETWEEN :desde AND :hasta
+          GROUP BY tipo
+            HAVING cantidad > 0 OR gasto > 0
+          ORDER BY gasto DESC",
+            $params
+        );
+
+        $resultado = [];
+        foreach ($rows as $r) {
+            $tipo = (string) $r['tipo'];
+            if ($tipo === 'otros') continue;
+            $cantidad = (int) ($r['cantidad'] ?? 0);
+            $gasto = (float) ($r['gasto'] ?? 0);
+            if ($cantidad <= 0) continue;
+            $resultado[] = [
+                'tipo' => $tipo,
+                'cantidad' => $cantidad,
+                'gasto' => $gasto,
+                'costo' => $cantidad > 0 ? $gasto / $cantidad : null,
+            ];
+        }
+        return $resultado;
+    }
+
+    /**
      * Una fila por campaña asignada con sus totales del rango.
      *
      * @return list<array<string,mixed>>
@@ -124,7 +235,25 @@ final class DashboardService
                      ELSE NULL END AS ctr,
                 CASE WHEN SUM(ms.clicks_totales) > 0
                      THEN SUM(ms.gasto) / SUM(ms.clicks_totales)
-                     ELSE NULL END AS cpc
+                     ELSE NULL END AS cpc,
+                -- Desglose por tipo de resultado (clasificado por optimization_goal
+                -- del adset, o el objetivo de la campaña si no está).
+                COALESCE(SUM(CASE
+                    WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') THEN ms.conversaciones
+                    WHEN cs.optimization_goal IS NULL AND c.objetivo = 'MESSAGES' THEN ms.conversaciones
+                    ELSE 0 END), 0) AS conversaciones,
+                COALESCE(SUM(CASE
+                    WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') THEN ms.leads
+                    WHEN cs.optimization_goal IS NULL AND c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN ms.leads
+                    ELSE 0 END), 0) AS leads,
+                COALESCE(SUM(CASE
+                    WHEN cs.optimization_goal IN ('POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN ms.interacciones
+                    WHEN cs.optimization_goal IS NULL AND c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN ms.interacciones
+                    ELSE 0 END), 0) AS interacciones,
+                COALESCE(SUM(CASE
+                    WHEN cs.optimization_goal IN ('LANDING_PAGE_VIEWS','LINK_CLICKS') THEN ms.landing_page_views
+                    WHEN cs.optimization_goal IS NULL AND c.objetivo IN ('OUTCOME_TRAFFIC','LINK_CLICKS') THEN ms.landing_page_views
+                    ELSE 0 END), 0) AS visitas
               FROM campanias c
               JOIN cuentas_publicitarias cp ON cp.id = c.cuenta_publicitaria_id
          LEFT JOIN conjuntos_anuncios cs ON cs.campania_id = c.id

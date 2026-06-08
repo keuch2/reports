@@ -59,6 +59,7 @@ final class PreviewClienteController
         $totales = $campaniasAsignadas === [] ? [] : $service->totalesGlobales($clienteId, $desde, $hasta);
         $campanias = $campaniasAsignadas === [] ? [] : $service->porCampania($clienteId, $desde, $hasta);
         $evolucion = $campaniasAsignadas === [] ? [] : $service->evolucionDiaria($clienteId, $desde, $hasta);
+        $resultadosPorTipo = $campaniasAsignadas === [] ? [] : $service->resultadosPorTipoGlobal($clienteId, $desde, $hasta);
 
         $permisos = $this->container->get(PermisosService::class);
         $deshabilitadas = $permisos->metricasDeshabilitadas($clienteId);
@@ -82,6 +83,7 @@ final class PreviewClienteController
             'totales' => $totales,
             'campanias' => $campanias,
             'evolucion' => $evolucion,
+            'resultados_por_tipo' => $resultadosPorTipo,
             'widgets_visibles' => $widgetsVisibles,
             'widgets_disponibles' => DashboardPreferenciasService::WIDGETS_DISPONIBLES,
             'metricas_deshabilitadas' => $deshabilitadas,
@@ -137,6 +139,9 @@ final class PreviewClienteController
         $campaniaConGoal = $cam + [
             'optimization_goal_predominante' => $optGoalPredominante,
         ];
+        $evolucion = $service->evolucionDiariaCampania($clienteId, $campaniaId, $desde, $hasta);
+        $resultadosPorTipo = $service->resultadosPorTipoCampania($clienteId, $campaniaId, $desde, $hasta);
+
         $analisis = $analisisService->generar(
             $totales,
             $campaniaConGoal,
@@ -144,9 +149,8 @@ final class PreviewClienteController
             (string) ($cam['moneda'] ?? ''),
             $desde,
             $hasta,
+            $resultadosPorTipo,
         );
-
-        $evolucion = $service->evolucionDiariaCampania($clienteId, $campaniaId, $desde, $hasta);
 
         $view = $this->container->get(View::class);
 
@@ -164,6 +168,7 @@ final class PreviewClienteController
             'meses_disponibles' => $mesesDisponibles,
             'analisis' => $analisis,
             'evolucion' => $evolucion,
+            'resultados_por_tipo' => $resultadosPorTipo,
         ]));
     }
 

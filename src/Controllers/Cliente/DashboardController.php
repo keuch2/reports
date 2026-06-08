@@ -58,6 +58,7 @@ final class DashboardController
         $totales = $service->totalesGlobales($clienteId, $desde, $hasta);
         $campanias = $service->porCampania($clienteId, $desde, $hasta);
         $evolucion = $service->evolucionDiaria($clienteId, $desde, $hasta);
+        $resultadosPorTipo = $service->resultadosPorTipoGlobal($clienteId, $desde, $hasta);
 
         $permisos = $this->container->get(PermisosService::class);
         $deshabilitadas = $permisos->metricasDeshabilitadas($clienteId);
@@ -82,6 +83,7 @@ final class DashboardController
             'totales' => $totales,
             'campanias' => $campanias,
             'evolucion' => $evolucion,
+            'resultados_por_tipo' => $resultadosPorTipo,
             'widgets_visibles' => $widgetsVisibles,
             'widgets_disponibles' => DashboardPreferenciasService::WIDGETS_DISPONIBLES,
             'metricas_deshabilitadas' => $deshabilitadas,

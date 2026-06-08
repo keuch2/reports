@@ -97,6 +97,15 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
         <?php endif; ?>
     </div>
 
+    <?php if (!empty($resultados_por_tipo ?? [])): ?>
+        <?= $view->renderPartial('partials/resultados_por_tipo', [
+            'resultados_por_tipo' => $resultados_por_tipo,
+            'mon' => $mon,
+            'fmtMoneda' => $fmtMoneda,
+            'fmtNum' => $fmtNum,
+        ]) ?>
+    <?php endif; ?>
+
     <?php if (!empty($evolucion ?? [])): ?>
         <article class="card" style="margin-top:1.5rem">
             <h2>Evolución diaria</h2>

@@ -17,6 +17,9 @@ final class AnalisisCampaniaService
      * @param array<string,mixed> $totales   métricas del rango actual
      * @param array<string,mixed> $campania  fila con `objetivo`, `optimization_goal` agregado, etc.
      * @param array<string,mixed>|null $previos métricas del período anterior comparable (mismo nro de días), opcional
+     * @param list<array{tipo:string, cantidad:int, gasto:float, costo:?float}> $resultadosPorTipo
+     *        Desglose por tipo de objetivo. Si trae 2+ entradas, el párrafo
+     *        las enumera en lugar de usar solo el "resultado principal".
      */
     public function generar(
         array $totales,
@@ -25,6 +28,7 @@ final class AnalisisCampaniaService
         string $moneda,
         string $desde,
         string $hasta,
+        array $resultadosPorTipo = [],
     ): string {
         $gasto = (float) ($totales['gasto'] ?? 0);
         $impresiones = (int) ($totales['impresiones'] ?? 0);
@@ -55,7 +59,16 @@ final class AnalisisCampaniaService
             $this->formatoNumero($impresiones),
         );
 
-        if ($resultados > 0) {
+        // Si hay desglose por tipo con 2+ entradas, enumeramos todos los tipos
+        // (caso típico: cliente con campañas de leads + WhatsApp + interacciones).
+        if (count($resultadosPorTipo) >= 2) {
+            $piezas = [];
+            foreach ($resultadosPorTipo as $r) {
+                $label = $this->labelTipoPlural((string) $r['tipo']);
+                $piezas[] = $this->formatoNumero((int) $r['cantidad']) . ' ' . $label;
+            }
+            $fragmentos[count($fragmentos) - 1] .= ', alcanzando ' . $this->enumerar($piezas);
+        } elseif ($resultados > 0) {
             $fragmentos[count($fragmentos) - 1] .= sprintf(
                 ', alcanzando %s %s',
                 $this->formatoNumero($resultados),
@@ -177,6 +190,32 @@ final class AnalisisCampaniaService
         }
         $meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
         return (int) date('j', $ts) . ' de ' . $meses[(int) date('n', $ts) - 1] . ' de ' . date('Y', $ts);
+    }
+
+    private function labelTipoPlural(string $tipo): string
+    {
+        return match ($tipo) {
+            'conversaciones' => 'conversaciones de WhatsApp',
+            'leads' => 'clientes potenciales',
+            'interacciones' => 'interacciones',
+            'visitas' => 'visitas al destino',
+            default => $tipo,
+        };
+    }
+
+    /**
+     * Une elementos como "a, b y c" (estilo español). Con un solo elemento
+     * devuelve ese elemento; con vacío devuelve string vacío.
+     *
+     * @param list<string> $items
+     */
+    private function enumerar(array $items): string
+    {
+        $n = count($items);
+        if ($n === 0) return '';
+        if ($n === 1) return $items[0];
+        $ultimo = array_pop($items);
+        return implode(', ', $items) . ' y ' . $ultimo;
     }
 
     private function pluralizar(int $n, string $palabra): string
