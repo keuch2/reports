@@ -226,11 +226,12 @@ final class DashboardService
                     WHEN COALESCE((SELECT GROUP_CONCAT(DISTINCT cs2.optimization_goal)
                                    FROM conjuntos_anuncios cs2
                                   WHERE cs2.campania_id = c.id), '') LIKE '%LEAD_GENERATION%' THEN SUM(ms.leads)
+                    WHEN COALESCE((SELECT GROUP_CONCAT(DISTINCT cs2.optimization_goal)
+                                   FROM conjuntos_anuncios cs2
+                                  WHERE cs2.campania_id = c.id), '') REGEXP 'POST_ENGAGEMENT|PAGE_LIKES|EVENT_RESPONSES' THEN SUM(ms.interacciones)
                     WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN SUM(ms.leads)
                     WHEN c.objetivo = 'MESSAGES' THEN SUM(ms.conversaciones)
-                    WHEN c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES')
-                         THEN CASE WHEN SUM(ms.conversaciones) > 0 THEN SUM(ms.conversaciones)
-                                   ELSE SUM(ms.interacciones) END
+                    WHEN c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN SUM(ms.interacciones)
                     WHEN c.objetivo IN ('OUTCOME_TRAFFIC','LINK_CLICKS') THEN SUM(ms.landing_page_views)
                     WHEN SUM(ms.resultados) > 0 THEN SUM(ms.resultados)
                     ELSE 0
@@ -288,11 +289,12 @@ final class DashboardService
                     WHEN COALESCE((SELECT GROUP_CONCAT(DISTINCT cs2.optimization_goal)
                                    FROM conjuntos_anuncios cs2
                                   WHERE cs2.campania_id = c.id), '') LIKE '%LEAD_GENERATION%' THEN SUM(ms.leads)
+                    WHEN COALESCE((SELECT GROUP_CONCAT(DISTINCT cs2.optimization_goal)
+                                   FROM conjuntos_anuncios cs2
+                                  WHERE cs2.campania_id = c.id), '') REGEXP 'POST_ENGAGEMENT|PAGE_LIKES|EVENT_RESPONSES' THEN SUM(ms.interacciones)
                     WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN SUM(ms.leads)
                     WHEN c.objetivo = 'MESSAGES' THEN SUM(ms.conversaciones)
-                    WHEN c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES')
-                         THEN CASE WHEN SUM(ms.conversaciones) > 0 THEN SUM(ms.conversaciones)
-                                   ELSE SUM(ms.interacciones) END
+                    WHEN c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN SUM(ms.interacciones)
                     WHEN SUM(ms.resultados) > 0 THEN SUM(ms.resultados)
                     ELSE 0
                 END AS resultados,
@@ -314,15 +316,18 @@ final class DashboardService
                                    FROM conjuntos_anuncios cs2
                                   WHERE cs2.campania_id = c.id), '') LIKE '%LEAD_GENERATION%' AND SUM(ms.leads) > 0
                         THEN SUM(ms.gasto) / SUM(ms.leads)
+                    WHEN COALESCE((SELECT GROUP_CONCAT(DISTINCT cs2.optimization_goal)
+                                   FROM conjuntos_anuncios cs2
+                                  WHERE cs2.campania_id = c.id), '') REGEXP 'POST_ENGAGEMENT|PAGE_LIKES|EVENT_RESPONSES'
+                         AND SUM(ms.interacciones) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.interacciones)
                     WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') AND SUM(ms.leads) > 0
                         THEN SUM(ms.gasto) / SUM(ms.leads)
                     WHEN c.objetivo = 'MESSAGES' AND SUM(ms.conversaciones) > 0
                         THEN SUM(ms.gasto) / SUM(ms.conversaciones)
                     WHEN c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES')
-                         AND (SUM(ms.conversaciones) > 0 OR SUM(ms.interacciones) > 0)
-                        THEN SUM(ms.gasto) / CASE WHEN SUM(ms.conversaciones) > 0
-                                                  THEN SUM(ms.conversaciones)
-                                                  ELSE SUM(ms.interacciones) END
+                         AND SUM(ms.interacciones) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.interacciones)
                     WHEN SUM(ms.resultados) > 0 THEN SUM(ms.gasto) / SUM(ms.resultados)
                     ELSE NULL
                 END AS costo_por_resultado,
@@ -412,10 +417,8 @@ final class DashboardService
                     WHEN c.objetivo = 'MESSAGES' AND SUM(ms.conversaciones) > 0
                         THEN SUM(ms.gasto) / SUM(ms.conversaciones)
                     WHEN c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES')
-                         AND (SUM(ms.conversaciones) > 0 OR SUM(ms.interacciones) > 0)
-                        THEN SUM(ms.gasto) / CASE WHEN SUM(ms.conversaciones) > 0
-                                                  THEN SUM(ms.conversaciones)
-                                                  ELSE SUM(ms.interacciones) END
+                         AND SUM(ms.interacciones) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.interacciones)
                     WHEN c.objetivo IN ('OUTCOME_TRAFFIC','LINK_CLICKS') AND SUM(ms.landing_page_views) > 0
                         THEN SUM(ms.gasto) / SUM(ms.landing_page_views)
                     WHEN SUM(ms.resultados) > 0 THEN SUM(ms.gasto) / SUM(ms.resultados)
@@ -507,10 +510,8 @@ final class DashboardService
                     WHEN c.objetivo = 'MESSAGES' AND SUM(ms.conversaciones) > 0
                         THEN SUM(ms.gasto) / SUM(ms.conversaciones)
                     WHEN c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES')
-                         AND (SUM(ms.conversaciones) > 0 OR SUM(ms.interacciones) > 0)
-                        THEN SUM(ms.gasto) / CASE WHEN SUM(ms.conversaciones) > 0
-                                                  THEN SUM(ms.conversaciones)
-                                                  ELSE SUM(ms.interacciones) END
+                         AND SUM(ms.interacciones) > 0
+                        THEN SUM(ms.gasto) / SUM(ms.interacciones)
                     WHEN c.objetivo IN ('OUTCOME_TRAFFIC','LINK_CLICKS') AND SUM(ms.landing_page_views) > 0
                         THEN SUM(ms.gasto) / SUM(ms.landing_page_views)
                     WHEN SUM(ms.resultados) > 0 THEN SUM(ms.gasto) / SUM(ms.resultados)

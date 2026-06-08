@@ -20,12 +20,15 @@ $objetivoCam = strtoupper((string) ($a['objetivo_campania'] ?? ''));
 $esLeads = in_array($optGoal, ['LEAD_GENERATION', 'QUALITY_LEAD', 'LEAD'], true)
     || ($optGoal === '' && in_array($objetivoCam, ['OUTCOME_LEADS', 'LEAD_GENERATION'], true));
 $esMensajes = in_array($optGoal, ['CONVERSATIONS', 'REPLIES'], true)
-    || ($optGoal === '' && in_array($objetivoCam, ['MESSAGES', 'OUTCOME_ENGAGEMENT'], true));
+    || ($optGoal === '' && $objetivoCam === 'MESSAGES');
+$esEngagement = in_array($optGoal, ['POST_ENGAGEMENT', 'PAGE_LIKES', 'EVENT_RESPONSES'], true)
+    || in_array($objetivoCam, ['OUTCOME_ENGAGEMENT', 'POST_ENGAGEMENT', 'PAGE_LIKES', 'EVENT_RESPONSES'], true);
 
 // No duplicamos la métrica: si Resultados ya es conversaciones, no mostramos
-// la fila Conversaciones aparte; idem leads.
-$mostrarConversaciones = !$esMensajes && !$esLeads && !($ocultarConversaciones ?? false);
-$mostrarLeads = !$esLeads && !$esMensajes && !($ocultarLeads ?? false);
+// la fila Conversaciones aparte; idem leads. Y para campañas de engagement
+// suprimimos conversaciones aisladas (clicks-to-WA residuales que confunden).
+$mostrarConversaciones = !$esMensajes && !$esLeads && !$esEngagement && !($ocultarConversaciones ?? false);
+$mostrarLeads = !$esLeads && !$esMensajes && !$esEngagement && !($ocultarLeads ?? false);
 
 $thumb = (string) ($a['image_url'] ?? $a['thumbnail_url'] ?? '');
 $cuerpo = (string) ($a['cuerpo'] ?? '');
