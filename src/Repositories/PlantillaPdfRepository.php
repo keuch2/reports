@@ -11,9 +11,11 @@ final class PlantillaPdfRepository
     /** Secciones disponibles para componer una plantilla. */
     public const SECCIONES_DISPONIBLES = [
         'resumen_ejecutivo' => 'Resumen ejecutivo (KPIs)',
+        'resultados_por_tipo' => 'Resultados por tipo (conversaciones, leads…)',
         'tabla_campanias' => 'Tabla de campañas',
         'tabla_anuncios' => 'Tabla de anuncios',
         'evolucion_diaria' => 'Evolución diaria',
+        'costos' => 'Costos del período (comisión + IVA)',
         'comentarios' => 'Comentarios estratégicos',
     ];
 

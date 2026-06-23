@@ -51,19 +51,26 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
     <?php if ($meses_disponibles === []): ?>
         <p class="muted">Aún no hay datos importados para esta campaña.</p>
     <?php else: ?>
-        <form method="GET" class="dashboard-filters">
-            <label class="field">
-                <span class="field__label">Mes</span>
-                <select class="field__input" name="mes" onchange="this.form.submit()">
-                    <?php foreach ($meses_disponibles as $m): ?>
-                        <option value="<?= $view->e($m) ?>" <?= $m === $mes_seleccionado ? 'selected' : '' ?>>
-                            <?= $view->e($formatMes($m)) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <span class="muted" style="align-self:center"><?= $view->e($desde) ?> → <?= $view->e($hasta) ?></span>
-        </form>
+        <div class="dashboard-filters">
+            <form method="GET" class="dashboard-filters" style="margin:0">
+                <label class="field">
+                    <span class="field__label">Mes</span>
+                    <select class="field__input" name="mes" onchange="this.form.submit()">
+                        <?php foreach ($meses_disponibles as $m): ?>
+                            <option value="<?= $view->e($m) ?>" <?= $m === $mes_seleccionado ? 'selected' : '' ?>>
+                                <?= $view->e($formatMes($m)) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <span class="muted" style="align-self:center"><?= $view->e($desde) ?> → <?= $view->e($hasta) ?></span>
+            </form>
+            <form method="POST" action="<?= $view->url('/cliente/campanias/' . ((int) $campania['id']) . '/reporte.pdf') ?>" style="align-self:center;margin:0">
+                <?= $view->csrfField() ?>
+                <input type="hidden" name="mes" value="<?= $view->e((string) $mes_seleccionado) ?>">
+                <button type="submit" class="btn btn--primary">📄 Exportar PDF</button>
+            </form>
+        </div>
     <?php endif; ?>
 
     <?php if (!empty($analisis ?? '')): ?>

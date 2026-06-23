@@ -115,4 +115,5 @@ return function (Router $router): void {
     $router->post('/cliente/preferencias', [ClientePreferenciasController::class, 'guardar'], $clienteCsrf);
     $router->get('/cliente/reporte/previa', [ClienteReporteController::class, 'previa'], $cliente);
     $router->post('/cliente/reporte.pdf', [ClienteReporteController::class, 'descargar'], $clienteCsrf);
+    $router->post('/cliente/campanias/{id}/reporte.pdf', [ClienteReporteController::class, 'descargarCampania'], $clienteCsrf);
 };

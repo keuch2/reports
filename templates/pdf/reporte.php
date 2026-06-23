@@ -7,17 +7,38 @@
 /** @var array<string,mixed> $totales */
 /** @var list<array<string,mixed>> $campanias */
 /** @var list<array<string,mixed>> $evolucion */
+/** @var list<array{tipo:string, cantidad:int, gasto:float, costo:?float}> $resultados_por_tipo */
 /** @var list<string> $secciones */
 /** @var string|null $comentarios */
 /** @var string $generado_en */
 
 $incluir = static fn (string $s): bool => in_array($s, $secciones, true);
 
-$fmtMoneda = static fn ($v) => number_format((float) $v, 2, ',', '.');
+$mon = (string) ($cuenta['moneda'] ?? '');
+
+// PYG no usa decimales; se redondea hacia arriba al guaraní entero — mismo
+// criterio que el dashboard (templates/cliente/campania_detalle.php y costos).
+$fmtMoneda = static fn ($v) => $mon === 'PYG'
+    ? number_format((float) ceil((float) $v), 0, ',', '.')
+    : number_format((float) $v, 2, ',', '.');
 $fmtNum = static fn ($v) => number_format((float) $v, 0, ',', '.');
 $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, ',', '.') . '%';
 
-$mon = (string) ($cuenta['moneda'] ?? '');
+// Etiquetas de resultado por tipo — idénticas a partials/resultados_por_tipo.php
+$labelTipo = [
+    'conversaciones' => ['plural' => 'Conversaciones WhatsApp', 'singular' => 'conversación'],
+    'leads' => ['plural' => 'Clientes potenciales', 'singular' => 'cliente potencial'],
+    'interacciones' => ['plural' => 'Interacciones', 'singular' => 'interacción'],
+    'visitas' => ['plural' => 'Visitas a destino', 'singular' => 'visita'],
+];
+
+// Columnas de resultado de la tabla de campañas: se muestran solo si alguna
+// campaña tiene datos — misma lógica que templates/cliente/dashboard_meta.php.
+$sumColumna = static fn (string $k): int => (int) array_sum(array_map(static fn ($c) => (int) ($c[$k] ?? 0), $campanias));
+$colConv = $sumColumna('conversaciones') > 0;
+$colLeads = $sumColumna('leads') > 0;
+$colInter = $sumColumna('interacciones') > 0;
+$colVisit = $sumColumna('visitas') > 0;
 ?>
 <style>
     body { font-family: sans-serif; color: #1a1d24; font-size: 10pt; }
@@ -36,6 +57,9 @@ $mon = (string) ($cuenta['moneda'] ?? '');
     .kpi-row td { width: 33%; padding: 8pt; border: 0.5pt solid #e5e7eb; background: #f9fafb; vertical-align: top; }
     .kpi-label { font-size: 8pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
     .kpi-value { font-size: 16pt; font-weight: 700; margin-top: 2pt; }
+    .kpi-sub { font-size: 8pt; color: #6b7280; margin-top: 2pt; }
+    .costos td, .costos th { font-size: 10pt; }
+    .costos .total td, .costos .total th { font-weight: 700; border-top: 1pt solid #1f3a8a; }
 </style>
 
 <div class="portada">
@@ -83,6 +107,26 @@ $mon = (string) ($cuenta['moneda'] ?? '');
 </table>
 <?php endif; // resumen_ejecutivo ?>
 
+<?php if ($incluir('resultados_por_tipo') && $resultados_por_tipo !== []): ?>
+<h2>Resultados</h2>
+<table class="kpi-row">
+    <tr>
+    <?php foreach ($resultados_por_tipo as $i => $r):
+        $info = $labelTipo[$r['tipo']] ?? ['plural' => ucfirst($r['tipo']), 'singular' => $r['tipo']];
+    ?>
+        <td>
+            <div class="kpi-label"><?= $view->e($info['plural']) ?></div>
+            <div class="kpi-value"><?= $fmtNum($r['cantidad']) ?></div>
+            <?php if ($r['costo'] !== null): ?>
+                <div class="kpi-sub"><?= $view->e($mon) ?> <?= $fmtMoneda($r['costo']) ?> por <?= $view->e($info['singular']) ?></div>
+            <?php endif; ?>
+        </td>
+        <?php if (($i + 1) % 3 === 0): ?></tr><tr><?php endif; ?>
+    <?php endforeach; ?>
+    </tr>
+</table>
+<?php endif; // resultados_por_tipo ?>
+
 <?php if ($incluir('tabla_campanias')): ?>
 <h2>Desempeño por campaña</h2>
 <?php if ($campanias === []): ?>
@@ -92,24 +136,34 @@ $mon = (string) ($cuenta['moneda'] ?? '');
         <thead>
             <tr>
                 <th>Campaña</th>
+                <th>Cuenta</th>
                 <th>Estado</th>
                 <th class="num">Gasto</th>
                 <th class="num">Impresiones</th>
                 <th class="num">Clicks</th>
                 <th class="num">CTR</th>
                 <th class="num">CPC</th>
+                <?php if ($colConv): ?><th class="num">Conversaciones</th><?php endif; ?>
+                <?php if ($colLeads): ?><th class="num">Clientes pot.</th><?php endif; ?>
+                <?php if ($colInter): ?><th class="num">Interacciones</th><?php endif; ?>
+                <?php if ($colVisit): ?><th class="num">Visitas</th><?php endif; ?>
             </tr>
         </thead>
         <tbody>
         <?php foreach ($campanias as $c): ?>
             <tr>
                 <td><?= $view->e((string) $c['campania']) ?></td>
+                <td><?= $view->e((string) ($c['cuenta_nombre'] ?? '')) ?></td>
                 <td><?= $view->e((string) ($c['estado'] ?? '—')) ?></td>
                 <td class="num"><?= $view->e($mon) ?> <?= $fmtMoneda($c['gasto']) ?></td>
                 <td class="num"><?= $fmtNum($c['impresiones']) ?></td>
                 <td class="num"><?= $fmtNum($c['clicks']) ?></td>
                 <td class="num"><?= $fmtPct($c['ctr']) ?></td>
                 <td class="num"><?= $c['cpc'] !== null ? $view->e($mon) . ' ' . $fmtMoneda($c['cpc']) : '—' ?></td>
+                <?php if ($colConv): ?><td class="num"><?= ((int) ($c['conversaciones'] ?? 0)) > 0 ? $fmtNum($c['conversaciones']) : '—' ?></td><?php endif; ?>
+                <?php if ($colLeads): ?><td class="num"><?= ((int) ($c['leads'] ?? 0)) > 0 ? $fmtNum($c['leads']) : '—' ?></td><?php endif; ?>
+                <?php if ($colInter): ?><td class="num"><?= ((int) ($c['interacciones'] ?? 0)) > 0 ? $fmtNum($c['interacciones']) : '—' ?></td><?php endif; ?>
+                <?php if ($colVisit): ?><td class="num"><?= ((int) ($c['visitas'] ?? 0)) > 0 ? $fmtNum($c['visitas']) : '—' ?></td><?php endif; ?>
             </tr>
         <?php endforeach; ?>
         </tbody>
@@ -139,6 +193,28 @@ $mon = (string) ($cuenta['moneda'] ?? '');
     </table>
 <?php endif; ?>
 <?php endif; // evolucion_diaria ?>
+
+<?php
+// Cuadro de costos — misma fórmula que partials/costos_campania.php
+// (comisión 20% + IVA 10% sobre el subtotal).
+$gastoCostos = (float) ($totales['gasto'] ?? 0);
+if ($incluir('costos') && $gastoCostos > 0):
+    $comision = $gastoCostos * 0.20;
+    $subtotal = $gastoCostos + $comision;
+    $iva = $subtotal * 0.10;
+    $total = $subtotal + $iva;
+?>
+<h2>Costos del período</h2>
+<table class="costos">
+    <tbody>
+        <tr><th>Costo neto</th><td class="num"><?= $view->e($mon) ?> <?= $fmtMoneda($gastoCostos) ?></td></tr>
+        <tr><th>Comisión agencia (20%)</th><td class="num"><?= $view->e($mon) ?> <?= $fmtMoneda($comision) ?></td></tr>
+        <tr><th>Subtotal sin IVA</th><td class="num"><?= $view->e($mon) ?> <?= $fmtMoneda($subtotal) ?></td></tr>
+        <tr><th>IVA (10%)</th><td class="num"><?= $view->e($mon) ?> <?= $fmtMoneda($iva) ?></td></tr>
+        <tr class="total"><th>Total con IVA</th><td class="num"><?= $view->e($mon) ?> <?= $fmtMoneda($total) ?></td></tr>
+    </tbody>
+</table>
+<?php endif; // costos ?>
 
 <?php if ($incluir('comentarios') && $comentarios !== null && trim($comentarios) !== ''): ?>
 <h2>Comentarios estratégicos</h2>

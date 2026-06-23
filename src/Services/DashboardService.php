@@ -155,38 +155,49 @@ final class DashboardService
      */
     private function ejecutarResultadosPorTipo(string $whereExtra, array $params): array
     {
+        // La clasificación por tipo se hace por fila (cada adset puede tener un
+        // optimization_goal distinto) en una subconsulta, y recién después se
+        // agrupa por ese 'tipo' ya materializado. Agrupar por el alias de un CASE
+        // directamente produce grupos no deterministas bajo MySQL sin
+        // ONLY_FULL_GROUP_BY (mezclaba conversaciones de un adset con el tipo
+        // 'otros' de otro), lo que descartaba resultados reales del bloque KPI.
         $rows = $this->db->select(
-            "SELECT
-                CASE
-                    WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') THEN 'conversaciones'
-                    WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') THEN 'leads'
-                    WHEN cs.optimization_goal IN ('POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN 'interacciones'
-                    WHEN cs.optimization_goal IN ('LANDING_PAGE_VIEWS','LINK_CLICKS') THEN 'visitas'
-                    WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN 'leads'
-                    WHEN c.objetivo = 'MESSAGES' THEN 'conversaciones'
-                    WHEN c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN 'interacciones'
-                    WHEN c.objetivo IN ('OUTCOME_TRAFFIC','LINK_CLICKS') THEN 'visitas'
-                    ELSE 'otros'
-                END AS tipo,
-                SUM(ms.gasto) AS gasto,
-                SUM(CASE
-                    WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') THEN ms.conversaciones
-                    WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') THEN ms.leads
-                    WHEN cs.optimization_goal IN ('POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN ms.interacciones
-                    WHEN cs.optimization_goal IN ('LANDING_PAGE_VIEWS','LINK_CLICKS') THEN ms.landing_page_views
-                    WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN ms.leads
-                    WHEN c.objetivo = 'MESSAGES' THEN ms.conversaciones
-                    WHEN c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN ms.interacciones
-                    WHEN c.objetivo IN ('OUTCOME_TRAFFIC','LINK_CLICKS') THEN ms.landing_page_views
-                    ELSE 0
-                END) AS cantidad
-              FROM metricas_snapshots ms
-              JOIN anuncios a ON a.id = ms.entidad_id AND ms.nivel = 'ad'
-              JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
-              JOIN campanias c ON c.id = cs.campania_id
-             WHERE {$whereExtra}
-               AND ms.fecha BETWEEN :desde AND :hasta
-          GROUP BY tipo
+            "SELECT clasificado.tipo AS tipo,
+                    SUM(clasificado.gasto) AS gasto,
+                    SUM(clasificado.cantidad) AS cantidad
+              FROM (
+                SELECT
+                    CASE
+                        WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') THEN 'conversaciones'
+                        WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') THEN 'leads'
+                        WHEN cs.optimization_goal IN ('POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN 'interacciones'
+                        WHEN cs.optimization_goal IN ('LANDING_PAGE_VIEWS','LINK_CLICKS') THEN 'visitas'
+                        WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN 'leads'
+                        WHEN c.objetivo = 'MESSAGES' THEN 'conversaciones'
+                        WHEN c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN 'interacciones'
+                        WHEN c.objetivo IN ('OUTCOME_TRAFFIC','LINK_CLICKS') THEN 'visitas'
+                        ELSE 'otros'
+                    END AS tipo,
+                    ms.gasto AS gasto,
+                    CASE
+                        WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') THEN ms.conversaciones
+                        WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') THEN ms.leads
+                        WHEN cs.optimization_goal IN ('POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN ms.interacciones
+                        WHEN cs.optimization_goal IN ('LANDING_PAGE_VIEWS','LINK_CLICKS') THEN ms.landing_page_views
+                        WHEN c.objetivo IN ('OUTCOME_LEADS','LEAD_GENERATION') THEN ms.leads
+                        WHEN c.objetivo = 'MESSAGES' THEN ms.conversaciones
+                        WHEN c.objetivo IN ('OUTCOME_ENGAGEMENT','POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN ms.interacciones
+                        WHEN c.objetivo IN ('OUTCOME_TRAFFIC','LINK_CLICKS') THEN ms.landing_page_views
+                        ELSE 0
+                    END AS cantidad
+                  FROM metricas_snapshots ms
+                  JOIN anuncios a ON a.id = ms.entidad_id AND ms.nivel = 'ad'
+                  JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
+                  JOIN campanias c ON c.id = cs.campania_id
+                 WHERE {$whereExtra}
+                   AND ms.fecha BETWEEN :desde AND :hasta
+              ) AS clasificado
+          GROUP BY clasificado.tipo
             HAVING cantidad > 0 OR gasto > 0
           ORDER BY gasto DESC",
             $params

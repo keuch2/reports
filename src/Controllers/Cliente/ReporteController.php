@@ -9,6 +9,7 @@ use MisterCo\Reports\Core\Request;
 use MisterCo\Reports\Core\Response;
 use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Domain\Usuario;
+use MisterCo\Reports\Repositories\EntidadesMetaRepository;
 use MisterCo\Reports\Repositories\PlantillaPdfRepository;
 use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\DashboardService;
@@ -32,13 +33,19 @@ final class ReporteController
             return Response::html('<h1>403 — No tenés campañas asignadas.</h1>', 403);
         }
 
-        $preset = (string) $request->input('preset', 'ultimos_30_dias');
+        $mesesDisponibles = $dashboard->mesesConDatosDelCliente($clienteId);
+        $mesSeleccionado = $this->resolverMes((string) $request->input('mes', ''), $mesesDisponibles);
+        [$desde, $hasta] = $this->resolverRango($request, $mesSeleccionado);
+
         $view = $this->container->get(View::class);
 
         return Response::html($view->render('cliente/reporte_previa', [
             'usuario' => $usuario,
             'titulo' => 'Generar reporte',
-            'preset' => $preset,
+            'meses_disponibles' => $mesesDisponibles,
+            'mes_seleccionado' => $mesSeleccionado,
+            'desde' => $desde,
+            'hasta' => $hasta,
         ]));
     }
 
@@ -53,11 +60,11 @@ final class ReporteController
             return Response::html('<h1>403 — No tenés campañas asignadas.</h1>', 403);
         }
 
-        [$desde, $hasta] = $this->resolverRango(
-            (string) $request->input('preset', 'ultimos_30_dias'),
-            (string) $request->input('desde', ''),
-            (string) $request->input('hasta', ''),
+        $mesSeleccionado = $this->resolverMes(
+            (string) $request->input('mes', ''),
+            $dashboard->mesesConDatosDelCliente($clienteId)
         );
+        [$desde, $hasta] = $this->resolverRango($request, $mesSeleccionado);
 
         $comentarios = trim((string) $request->input('comentarios', ''));
         $marcaDeAgua = filter_var($request->input('marca_de_agua', false), FILTER_VALIDATE_BOOLEAN);
@@ -76,6 +83,49 @@ final class ReporteController
             ['rango' => "{$desde} a {$hasta}", 'tamanio' => $pdf['tamanio'] ?? 0]
         );
 
+        return $this->responderPdf($pdf);
+    }
+
+    public function descargarCampania(Request $request): Response
+    {
+        /** @var Usuario $usuario */
+        $usuario = $request->attributes['usuario'];
+        $clienteId = (int) $usuario->clienteId;
+        $campaniaId = (int) ($request->attributes['id'] ?? 0);
+
+        $dashboard = $this->container->get(DashboardService::class);
+        if (!$dashboard->clienteTieneAccesoACampania($clienteId, $campaniaId)) {
+            return Response::html('<h1>403 — Sin acceso a esta campaña.</h1>', 403);
+        }
+
+        $entidades = $this->container->get(EntidadesMetaRepository::class);
+        $mesSeleccionado = $this->resolverMes(
+            (string) $request->input('mes', ''),
+            $entidades->mesesConDatosDeCampania($campaniaId)
+        );
+        [$desde, $hasta] = $this->resolverRango($request, $mesSeleccionado);
+
+        $comentarios = trim((string) $request->input('comentarios', ''));
+        $marcaDeAgua = filter_var($request->input('marca_de_agua', false), FILTER_VALIDATE_BOOLEAN);
+
+        $pdf = $this->container->get(ReportePdfService::class)
+            ->generarCampania($clienteId, $campaniaId, $desde, $hasta, $usuario->id,
+                $comentarios !== '' ? $comentarios : null, $marcaDeAgua);
+
+        $this->container->get(AuditService::class)->registrar(
+            'pdf.generado', $usuario, $request->ip, $request->userAgent,
+            'reporte_pdf_campania', (string) ($pdf['nombre'] ?? ''),
+            ['campania_id' => $campaniaId, 'rango' => "{$desde} a {$hasta}", 'tamanio' => $pdf['tamanio'] ?? 0]
+        );
+
+        return $this->responderPdf($pdf);
+    }
+
+    /**
+     * @param array{ruta:string, nombre:string, tamanio:int} $pdf
+     */
+    private function responderPdf(array $pdf): Response
+    {
         $contenido = (string) file_get_contents($pdf['ruta']);
 
         return new Response(
@@ -90,23 +140,43 @@ final class ReporteController
         );
     }
 
-    /** @return array{0:string,1:string} */
-    private function resolverRango(string $preset, string $desdeInput, string $hastaInput): array
+    /**
+     * Resuelve el rango de fechas igual que el dashboard: si llega un rango
+     * personalizado (desde/hasta) válido, lo respeta; si no, usa el mes
+     * calendario completo del mes seleccionado (YYYY-MM). Si tampoco hay mes,
+     * cae al mes actual. Así el PDF SIEMPRE cubre el mismo período que la
+     * pantalla desde la que se exportó.
+     *
+     * @return array{0:string,1:string}
+     */
+    private function resolverRango(Request $request, ?string $mesSeleccionado): array
     {
-        $hoy = date('Y-m-d');
-        $presets = [
-            'hoy' => [$hoy, $hoy],
-            'ayer' => [date('Y-m-d', strtotime('-1 day')), date('Y-m-d', strtotime('-1 day'))],
-            'ultimos_7_dias' => [date('Y-m-d', strtotime('-7 days')), $hoy],
-            'ultimos_30_dias' => [date('Y-m-d', strtotime('-30 days')), $hoy],
-            'mes_actual' => [date('Y-m-01'), $hoy],
-            'mes_pasado' => [date('Y-m-01', strtotime('first day of last month')), date('Y-m-t', strtotime('last day of last month'))],
-        ];
-
-        if ($preset === 'personalizado' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $desdeInput) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $hastaInput)) {
+        $desdeInput = (string) $request->input('desde', '');
+        $hastaInput = (string) $request->input('hasta', '');
+        $fecha = '/^\d{4}-\d{2}-\d{2}$/';
+        if (preg_match($fecha, $desdeInput) && preg_match($fecha, $hastaInput)) {
             return [$desdeInput, $hastaInput];
         }
 
-        return $presets[$preset] ?? $presets['ultimos_30_dias'];
+        $ts = $mesSeleccionado !== null ? strtotime($mesSeleccionado . '-01') : time();
+
+        return [date('Y-m-01', $ts), date('Y-m-t', $ts)];
+    }
+
+    /**
+     * Si el mes pedido (YYYY-MM) está disponible lo usa; si no, el más reciente;
+     * null si el cliente/campaña no tiene meses con datos.
+     *
+     * @param list<string> $disponibles
+     */
+    private function resolverMes(string $mes, array $disponibles): ?string
+    {
+        if ($disponibles === []) {
+            return null;
+        }
+        if ($mes !== '' && in_array($mes, $disponibles, true)) {
+            return $mes;
+        }
+        return $disponibles[0];
     }
 }

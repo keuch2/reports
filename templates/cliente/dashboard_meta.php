@@ -66,7 +66,7 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
             </label>
             <span class="muted" style="align-self:center"><?= $view->e($desde) ?> → <?= $view->e($hasta) ?></span>
 
-            <a href="<?= $view->url('/cliente/reporte/previa?preset=personalizado&desde=' . $view->e($desde) . '&hasta=' . $view->e($hasta)) ?>"
+            <a href="<?= $view->url('/cliente/reporte/previa?mes=' . $view->e((string) $mes_seleccionado) . '&desde=' . $view->e($desde) . '&hasta=' . $view->e($hasta)) ?>"
                class="btn btn--primary">📄 Exportar PDF</a>
         </form>
     <?php endif; ?>

@@ -37,12 +37,15 @@ final class ReportePdfService
         $cliente = $this->buscarCliente($clienteId);
 
         if ($secciones === []) {
-            $secciones = ['resumen_ejecutivo', 'tabla_campanias', 'evolucion_diaria'];
+            $secciones = ['resumen_ejecutivo', 'resultados_por_tipo', 'tabla_campanias', 'evolucion_diaria', 'costos'];
         }
 
+        // Mismas fuentes de datos que el dashboard (DashboardController::index)
+        // para garantizar números idénticos: mismo rango → mismas consultas.
         $totales = $this->dashboard->totalesGlobales($clienteId, $desde, $hasta);
         $campanias = $this->dashboard->porCampania($clienteId, $desde, $hasta);
         $evolucion = $this->dashboard->evolucionDiaria($clienteId, $desde, $hasta);
+        $resultadosPorTipo = $this->dashboard->resultadosPorTipoGlobal($clienteId, $desde, $hasta);
 
         // La moneda del PDF es la de la primera campaña asignada (asumimos consistencia).
         $monedaInfo = $this->db->selectOne(
@@ -64,11 +67,106 @@ final class ReportePdfService
             'totales' => $totales,
             'campanias' => $campanias,
             'evolucion' => $evolucion,
+            'resultados_por_tipo' => $resultadosPorTipo,
             'secciones' => $secciones,
             'comentarios' => $comentarios,
             'generado_en' => date('Y-m-d H:i'),
         ], layout: null);
 
+        $nombre = sprintf(
+            'reporte_%d_%s_%s_a_%s.pdf',
+            $clienteId,
+            preg_replace('/[^a-z0-9]+/i', '-', strtolower((string) $cliente['nombre_comercial'])),
+            $desde,
+            $hasta
+        );
+
+        return $this->renderizarPdf(
+            $html, $nombre, (string) $cliente['nombre_comercial'], $desde, $hasta,
+            $clienteId, $generadoPorUsuarioId, $comentarios, $marcaDeAgua
+        );
+    }
+
+    /**
+     * Genera un PDF de UNA campaña, reflejando exactamente la pantalla de
+     * detalle de campaña (CampaniaController::detalle): mismos totales, mismos
+     * resultados por tipo, misma tabla de grupos de anuncios y misma evolución.
+     *
+     * @return array{ruta:string, nombre:string, tamanio:int}
+     */
+    public function generarCampania(
+        int $clienteId,
+        int $campaniaId,
+        string $desde,
+        string $hasta,
+        int $generadoPorUsuarioId,
+        ?string $comentarios = null,
+        bool $marcaDeAgua = false,
+    ): array {
+        $cliente = $this->buscarCliente($clienteId);
+
+        $campania = $this->db->selectOne(
+            'SELECT c.id, c.nombre, c.objetivo, c.estado,
+                    cp.nombre AS cuenta_nombre, cp.moneda
+               FROM campanias c
+               JOIN cuentas_publicitarias cp ON cp.id = c.cuenta_publicitaria_id
+              WHERE c.id = :id',
+            ['id' => $campaniaId]
+        );
+        if ($campania === null) {
+            throw new \RuntimeException("Campaña {$campaniaId} no encontrada.");
+        }
+
+        // Mismas fuentes que CampaniaController::detalle.
+        $totales = $this->dashboard->totalesCampania($clienteId, $campaniaId, $desde, $hasta);
+        $adsets = $this->dashboard->adsetsDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta);
+        $resultadosPorTipo = $this->dashboard->resultadosPorTipoCampania($clienteId, $campaniaId, $desde, $hasta);
+        $evolucion = $this->dashboard->evolucionDiariaCampania($clienteId, $campaniaId, $desde, $hasta);
+
+        $html = $this->view->render('pdf/reporte_campania', [
+            'cliente' => $cliente,
+            'campania' => $campania,
+            'desde' => $desde,
+            'hasta' => $hasta,
+            'totales' => $totales,
+            'adsets' => $adsets,
+            'resultados_por_tipo' => $resultadosPorTipo,
+            'evolucion' => $evolucion,
+            'comentarios' => $comentarios,
+            'generado_en' => date('Y-m-d H:i'),
+        ], layout: null);
+
+        $nombre = sprintf(
+            'reporte_campania_%d_%s_%s_a_%s.pdf',
+            $campaniaId,
+            preg_replace('/[^a-z0-9]+/i', '-', strtolower((string) $campania['nombre'])),
+            $desde,
+            $hasta
+        );
+
+        return $this->renderizarPdf(
+            $html, $nombre, (string) $cliente['nombre_comercial'], $desde, $hasta,
+            $clienteId, $generadoPorUsuarioId, $comentarios, $marcaDeAgua
+        );
+    }
+
+    /**
+     * Renderiza el HTML a PDF, lo guarda en disco y registra en el histórico.
+     * Compartido por el reporte global y el de campaña.
+     *
+     * @return array{ruta:string, nombre:string, tamanio:int}
+     */
+    private function renderizarPdf(
+        string $html,
+        string $nombre,
+        string $nombreComercial,
+        string $desde,
+        string $hasta,
+        int $clienteId,
+        int $generadoPorUsuarioId,
+        ?string $comentarios,
+        bool $marcaDeAgua,
+    ): array {
         $mpdf = new Mpdf([
             'mode' => 'utf-8',
             'format' => 'A4',
@@ -79,13 +177,13 @@ final class ReportePdfService
             'tempDir' => $this->storagePath . '/../cache',
         ]);
 
-        $mpdf->SetTitle('Reporte ' . $cliente['nombre_comercial'] . ' · ' . $desde . ' al ' . $hasta);
+        $mpdf->SetTitle('Reporte ' . $nombreComercial . ' · ' . $desde . ' al ' . $hasta);
         $mpdf->SetAuthor('Mister Co.');
         $mpdf->SetCreator('Mister Co. Reports');
         $mpdf->SetHTMLFooter('<div style="text-align:center;color:#999;font-size:9pt">Mister Co. · mister.com.py · Página {PAGENO}/{nbpg}</div>');
 
         if ($marcaDeAgua) {
-            $mpdf->SetWatermarkText('CONFIDENCIAL — ' . mb_strtoupper((string) $cliente['nombre_comercial']));
+            $mpdf->SetWatermarkText('CONFIDENCIAL — ' . mb_strtoupper($nombreComercial));
             $mpdf->showWatermarkText = true;
             $mpdf->watermark_font = 'DejaVuSans';
             $mpdf->watermarkTextAlpha = 0.08;
@@ -93,13 +191,6 @@ final class ReportePdfService
 
         $mpdf->WriteHTML($html);
 
-        $nombre = sprintf(
-            'reporte_%d_%s_%s_a_%s.pdf',
-            $clienteId,
-            preg_replace('/[^a-z0-9]+/i', '-', strtolower((string) $cliente['nombre_comercial'])),
-            $desde,
-            $hasta
-        );
         $ruta = $this->storagePath . '/' . $nombre;
         $mpdf->Output($ruta, \Mpdf\Output\Destination::FILE);
 
