@@ -81,6 +81,16 @@ foreach ($campanias_por_cuenta as $cuentaId => $camps) {
                     </label>
                 </div>
 
+                <div id="importar-todo-box" style="display:none;background:var(--color-surface-alt,#f5f6f8);border:1px solid var(--color-border);border-radius:var(--radius);padding:0.75rem 1rem;margin-bottom:0.5rem">
+                    <label style="display:flex;gap:0.6rem;align-items:flex-start;cursor:pointer;margin:0">
+                        <input type="checkbox" name="importar_todo" id="importar-todo" value="1" checked style="margin-top:0.2rem">
+                        <span>
+                            <strong>Importar toda la cuenta</strong> (recomendado)
+                            <br><small class="muted">Trae <em>todas</em> las campañas de Meta, incluidas las nuevas y las completadas que todavía no están en el sistema. Desmarcá esta opción solo si querés elegir campañas específicas.</small>
+                        </span>
+                    </label>
+                </div>
+
                 <fieldset class="fieldset" id="campanias-fieldset" style="display:none">
                     <legend>Campañas a importar</legend>
                     <p class="muted" style="margin:0">
@@ -90,8 +100,8 @@ foreach ($campanias_por_cuenta as $cuentaId => $camps) {
                     </p>
                     <div id="campanias-lista" style="max-height:360px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius);padding:0.5rem"></div>
                     <p class="muted" style="font-size:0.85rem;margin:0">
-                        Tip: si la cuenta es grande o falla por timeout, marcá solo las campañas que querés actualizar.
-                        Si no marcás ninguna, se importa la cuenta entera.
+                        Solo se importarán las campañas marcadas. Las campañas nuevas de Meta que todavía no
+                        aparezcan acá no se traerán en modo selectivo: para eso usá "Importar toda la cuenta".
                     </p>
                 </fieldset>
 
@@ -159,17 +169,23 @@ const cuentaSelect = document.getElementById('cuenta-select');
 const fieldset = document.getElementById('campanias-fieldset');
 const lista = document.getElementById('campanias-lista');
 const modoLabel = document.getElementById('campanias-modo');
+const importarTodoBox = document.getElementById('importar-todo-box');
+const importarTodo = document.getElementById('importar-todo');
 
 function renderCampanias(cuentaId) {
     const camps = campaniasPorCuenta[cuentaId] || [];
     const sinConocer = document.getElementById('campanias-sin-conocer');
+
+    // El box "Importar toda la cuenta" se muestra siempre que haya cuenta elegida.
+    importarTodoBox.style.display = cuentaId ? '' : 'none';
+
     if (camps.length === 0) {
+        // Cuenta sin campañas conocidas: no hay lista para elegir; siempre cuenta completa.
         fieldset.style.display = 'none';
         sinConocer.style.display = cuentaId ? '' : 'none';
         return;
     }
     sinConocer.style.display = 'none';
-    fieldset.style.display = '';
     lista.innerHTML = camps.map(c => {
         const obj = c.objetivo ? ` <small style="color:var(--color-muted)">· ${c.objetivo}</small>` : '';
         const est = c.estado ? ` <small style="color:var(--color-muted)">· ${c.estado}</small>` : '';
@@ -178,7 +194,20 @@ function renderCampanias(cuentaId) {
             <span><strong>${c.nombre}</strong>${obj}${est}</span>
         </label>`;
     }).join('');
+    aplicarModoImportarTodo();
     actualizarModoLabel();
+}
+
+// Cuando "Importar toda la cuenta" está marcado, la lista selectiva se oculta y
+// sus checkboxes se desmarcan/deshabilitan para que NO viajen en el POST.
+function aplicarModoImportarTodo() {
+    const todo = importarTodo.checked;
+    fieldset.style.display = todo ? 'none' : '';
+    lista.querySelectorAll('input[type=checkbox]').forEach(c => {
+        c.disabled = todo;
+        if (todo) c.checked = false;
+    });
+    if (!todo) actualizarModoLabel();
 }
 
 function actualizarModoLabel() {
@@ -191,6 +220,7 @@ function actualizarModoLabel() {
 
 cuentaSelect.addEventListener('change', () => renderCampanias(cuentaSelect.value));
 lista.addEventListener('change', actualizarModoLabel);
+importarTodo.addEventListener('change', aplicarModoImportarTodo);
 
 document.getElementById('btn-todas').addEventListener('click', () => {
     lista.querySelectorAll('input[type=checkbox]').forEach(c => c.checked = true);

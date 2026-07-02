@@ -73,12 +73,18 @@ final class ImportacionController
         $rangoInicio = (string) $request->input('rango_inicio', '');
         $rangoFin = (string) $request->input('rango_fin', '');
 
+        // "Importar toda la cuenta" fuerza el modo cuenta-completa e ignora
+        // cualquier selección de campañas. Es la opción por defecto y la única
+        // forma de traer campañas nuevas que todavía no están en el sistema
+        // (la lista de checkboxes sale de la BD, no de Meta en vivo).
+        $importarTodo = filter_var($request->input('importar_todo', false), FILTER_VALIDATE_BOOLEAN);
+
         // Lista opcional de meta_campaign_id a importar. Si vacía → toda la cuenta.
         $campaniasInput = $request->post['campanias_meta_ids'] ?? [];
         if (!is_array($campaniasInput)) {
             $campaniasInput = [];
         }
-        $metaCampaignIds = array_values(array_filter(array_map(
+        $metaCampaignIds = $importarTodo ? [] : array_values(array_filter(array_map(
             static fn ($v) => trim((string) $v),
             $campaniasInput
         ), 'strlen'));
