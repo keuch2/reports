@@ -83,25 +83,24 @@ final class ImportacionService
      * effective_status a incluir en los endpoints de listado.
      *
      * Por defecto, /campaigns, /adsets y /ads de la Marketing API SOLO devuelven
-     * entidades ACTIVE y PAUSED (excluyen ARCHIVED/DELETED y las que el usuario
-     * percibe como "finalizadas/completadas"). Para importar TODAS las campañas
-     * —incluidas las ya completadas— hay que pasar effective_status explícito con
-     * la lista completa. Los valores válidos difieren por nivel.
+     * entidades ACTIVE y PAUSED. Las que el usuario ve como "Completado" en Ads
+     * Manager (período/presupuesto agotado) siguen siendo ACTIVE/PAUSED a nivel
+     * de configuración, así que se traen igual — pero para NO perder las
+     * archivadas y otros estados de entrega hay que pasar effective_status
+     * explícito con toda la lista.
      *
-     * Se envía como json_encode([...]) (Meta espera un array JSON, no CSV).
+     * IMPORTANTE:
+     * - Se envía como json_encode([...]): Meta exige un array JSON, un CSV da 400.
+     * - NO incluir 'DELETED': aunque figura en el enum, pasarlo hace que Meta
+     *   rechace la query entera con 400 (Invalid parameter), dejando la
+     *   importación en 0 campañas. Verificado contra la API real (2026-07).
+     * - 'COMPLETED' NO es un effective_status válido (es estado de entrega).
+     *
+     * Estos 11 valores son válidos en los tres niveles (el enum de adsets/ads es
+     * superset del de campaigns); usamos la misma lista para simplificar.
      */
-    private const CAMPAIGN_EFFECTIVE_STATUS = [
-        'ACTIVE', 'PAUSED', 'DELETED', 'ARCHIVED',
-        'IN_PROCESS', 'WITH_ISSUES',
-    ];
-
-    private const ADSET_EFFECTIVE_STATUS = [
-        'ACTIVE', 'PAUSED', 'DELETED', 'ARCHIVED',
-        'CAMPAIGN_PAUSED', 'IN_PROCESS', 'WITH_ISSUES',
-    ];
-
-    private const AD_EFFECTIVE_STATUS = [
-        'ACTIVE', 'PAUSED', 'DELETED', 'ARCHIVED',
+    private const EFFECTIVE_STATUS_TODOS = [
+        'ACTIVE', 'PAUSED', 'ARCHIVED',
         'CAMPAIGN_PAUSED', 'ADSET_PAUSED',
         'PENDING_REVIEW', 'DISAPPROVED', 'PREAPPROVED',
         'PENDING_BILLING_INFO', 'IN_PROCESS', 'WITH_ISSUES',
@@ -169,7 +168,7 @@ final class ImportacionService
                 'fields' => ['id', 'name', 'objective', 'status', 'start_time', 'stop_time',
                              'daily_budget', 'lifetime_budget'],
                 // Incluye completadas/archivadas: sin esto Meta solo devuelve ACTIVE/PAUSED.
-                'effective_status' => json_encode(self::CAMPAIGN_EFFECTIVE_STATUS),
+                'effective_status' => json_encode(self::EFFECTIVE_STATUS_TODOS),
                 'limit' => 100,
             ];
             if ($filtroActivo) {
@@ -207,7 +206,7 @@ final class ImportacionService
                 'fields' => ['id', 'name', 'campaign_id', 'status', 'targeting',
                              'daily_budget', 'lifetime_budget', 'optimization_goal'],
                 // Incluye adsets de campañas completadas/pausadas/archivadas.
-                'effective_status' => json_encode(self::ADSET_EFFECTIVE_STATUS),
+                'effective_status' => json_encode(self::EFFECTIVE_STATUS_TODOS),
                 'limit' => 100,
             ];
             if ($filtroActivo) {
@@ -249,7 +248,7 @@ final class ImportacionService
                     $creativeFieldsExpr,
                 ],
                 // Incluye ads de campañas completadas/pausadas/archivadas.
-                'effective_status' => json_encode(self::AD_EFFECTIVE_STATUS),
+                'effective_status' => json_encode(self::EFFECTIVE_STATUS_TODOS),
                 'limit' => 100,
             ];
             if ($filtroActivo) {
