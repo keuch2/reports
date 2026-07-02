@@ -452,6 +452,44 @@ final class ImportacionService
     }
 
     /**
+     * Lista EN VIVO las campañas de una cuenta desde Meta (no desde la BD).
+     * Sirve para que la UI de importación selectiva muestre también campañas
+     * nuevas/completadas que todavía no fueron importadas al sistema.
+     *
+     * @return list<array{meta_id:string, nombre:string, objetivo:string, estado:string}>
+     */
+    public function listarCampaniasDeMeta(int $cuentaId): array
+    {
+        $cuenta = $this->cuentasRepo->buscarPorId($cuentaId);
+        if ($cuenta === null) {
+            throw new RuntimeException("Cuenta publicitaria {$cuentaId} no existe.");
+        }
+        $metaAccountId = (string) $cuenta['meta_account_id'];
+        $cliente = $this->tokenService->cliente();
+
+        $query = [
+            'fields' => ['id', 'name', 'objective', 'status'],
+            'effective_status' => json_encode(self::EFFECTIVE_STATUS_TODOS),
+            'limit' => 200,
+        ];
+
+        $campanias = [];
+        foreach ($cliente->paginar("act_{$metaAccountId}/campaigns", $query) as $c) {
+            $campanias[] = [
+                'meta_id' => (string) $c['id'],
+                'nombre' => (string) ($c['name'] ?? 'Sin nombre'),
+                'objetivo' => (string) ($c['objective'] ?? ''),
+                'estado' => (string) ($c['status'] ?? ''),
+            ];
+        }
+
+        // Orden alfabético para que la lista sea navegable.
+        usort($campanias, static fn ($a, $b) => strcasecmp($a['nombre'], $b['nombre']));
+
+        return $campanias;
+    }
+
+    /**
      * Suma los valores de `actions` cuyo `action_type` matchea alguno de los buscados.
      *
      * @param list<array<string,mixed>> $actions

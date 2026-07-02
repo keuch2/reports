@@ -59,6 +59,7 @@ return function (Router $router): void {
     $router->post('/admin/meta/desconectar', [MetaConexionController::class, 'desconectar'], $adminCsrf);
 
     $router->get('/admin/importar', [ImportacionController::class, 'mostrar'], $admin);
+    $router->get('/admin/importar/campanias', [ImportacionController::class, 'campaniasEnVivo'], $admin);
     $router->post('/admin/importar', [ImportacionController::class, 'ejecutar'], $adminCsrf);
 
     $router->get('/admin/clientes', [AdminClienteController::class, 'listar'], $admin);

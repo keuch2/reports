@@ -11,16 +11,9 @@
 /** @var string|null $error */
 /** @var string|null $success */
 
-// JSON con campañas por cuenta para el JS (id=meta_campaign_id para el filtering Meta).
-$campaniasJson = [];
-foreach ($campanias_por_cuenta as $cuentaId => $camps) {
-    $campaniasJson[$cuentaId] = array_map(static fn ($c) => [
-        'meta_id' => (string) $c['meta_campaign_id'],
-        'nombre' => (string) $c['nombre'],
-        'objetivo' => (string) ($c['objetivo'] ?? ''),
-        'estado' => (string) ($c['estado'] ?? ''),
-    ], $camps);
-}
+// La lista de campañas para selección se carga EN VIVO desde Meta vía
+// /admin/importar/campanias (ver JS abajo), no desde $campanias_por_cuenta,
+// para incluir campañas nuevas/completadas aún no importadas.
 ?>
 <?= $view->renderPartial('partials/admin_header', ['usuario' => $usuario, 'seccion' => 'importar']) ?>
 
@@ -164,28 +157,18 @@ foreach ($campanias_por_cuenta as $cuentaId => $camps) {
 </section>
 
 <script>
-const campaniasPorCuenta = <?= json_encode($campaniasJson, JSON_UNESCAPED_UNICODE) ?>;
 const cuentaSelect = document.getElementById('cuenta-select');
 const fieldset = document.getElementById('campanias-fieldset');
 const lista = document.getElementById('campanias-lista');
 const modoLabel = document.getElementById('campanias-modo');
 const importarTodoBox = document.getElementById('importar-todo-box');
 const importarTodo = document.getElementById('importar-todo');
+const urlCampanias = '<?= $view->url('/admin/importar/campanias') ?>';
 
-function renderCampanias(cuentaId) {
-    const camps = campaniasPorCuenta[cuentaId] || [];
-    const sinConocer = document.getElementById('campanias-sin-conocer');
+// Cache de campañas en vivo por cuenta (evita re-consultar Meta al re-tildar).
+const cacheEnVivo = {};
 
-    // El box "Importar toda la cuenta" se muestra siempre que haya cuenta elegida.
-    importarTodoBox.style.display = cuentaId ? '' : 'none';
-
-    if (camps.length === 0) {
-        // Cuenta sin campañas conocidas: no hay lista para elegir; siempre cuenta completa.
-        fieldset.style.display = 'none';
-        sinConocer.style.display = cuentaId ? '' : 'none';
-        return;
-    }
-    sinConocer.style.display = 'none';
+function pintarLista(camps) {
     lista.innerHTML = camps.map(c => {
         const obj = c.objetivo ? ` <small style="color:var(--color-muted)">· ${c.objetivo}</small>` : '';
         const est = c.estado ? ` <small style="color:var(--color-muted)">· ${c.estado}</small>` : '';
@@ -194,31 +177,72 @@ function renderCampanias(cuentaId) {
             <span><strong>${c.nombre}</strong>${obj}${est}</span>
         </label>`;
     }).join('');
-    aplicarModoImportarTodo();
     actualizarModoLabel();
 }
 
-// Cuando "Importar toda la cuenta" está marcado, la lista selectiva se oculta y
-// sus checkboxes se desmarcan/deshabilitan para que NO viajen en el POST.
+// Carga las campañas EN VIVO desde Meta para la cuenta elegida y las muestra
+// para selección. Así aparecen también las campañas nuevas/completadas que
+// todavía no fueron importadas al sistema.
+async function cargarCampaniasEnVivo(cuentaId) {
+    if (!cuentaId) return;
+    fieldset.style.display = '';
+    if (cacheEnVivo[cuentaId]) { pintarLista(cacheEnVivo[cuentaId]); return; }
+
+    lista.innerHTML = '<p class="muted" style="margin:0.5rem">Cargando campañas desde Meta…</p>';
+    modoLabel.textContent = 'Cargando…';
+    try {
+        const resp = await fetch(urlCampanias + '?cuenta_id=' + encodeURIComponent(cuentaId), {
+            headers: { 'Accept': 'application/json' },
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.error) {
+            lista.innerHTML = '<p class="alert alert--error" style="margin:0.5rem">' +
+                (data.error || 'No se pudieron cargar las campañas.') + '</p>';
+            modoLabel.textContent = 'Error al cargar';
+            return;
+        }
+        cacheEnVivo[cuentaId] = data.campanias || [];
+        if (cacheEnVivo[cuentaId].length === 0) {
+            lista.innerHTML = '<p class="muted" style="margin:0.5rem">Esta cuenta no tiene campañas en Meta.</p>';
+            modoLabel.textContent = 'Sin campañas';
+            return;
+        }
+        pintarLista(cacheEnVivo[cuentaId]);
+    } catch (e) {
+        lista.innerHTML = '<p class="alert alert--error" style="margin:0.5rem">Error de red al consultar Meta.</p>';
+        modoLabel.textContent = 'Error al cargar';
+    }
+}
+
+function alElegirCuenta(cuentaId) {
+    importarTodoBox.style.display = cuentaId ? '' : 'none';
+    document.getElementById('campanias-sin-conocer').style.display = 'none';
+    // Al cambiar de cuenta reseteamos a "importar todo" (opción segura por defecto).
+    importarTodo.checked = true;
+    aplicarModoImportarTodo();
+}
+
+// Cuando "Importar toda la cuenta" está marcado, la lista selectiva se oculta.
+// Cuando se desmarca, cargamos las campañas EN VIVO desde Meta para elegir.
 function aplicarModoImportarTodo() {
     const todo = importarTodo.checked;
-    fieldset.style.display = todo ? 'none' : '';
-    lista.querySelectorAll('input[type=checkbox]').forEach(c => {
-        c.disabled = todo;
-        if (todo) c.checked = false;
-    });
-    if (!todo) actualizarModoLabel();
+    if (todo) {
+        fieldset.style.display = 'none';
+        lista.querySelectorAll('input[type=checkbox]').forEach(c => { c.disabled = true; c.checked = false; });
+    } else {
+        cargarCampaniasEnVivo(cuentaSelect.value);
+    }
 }
 
 function actualizarModoLabel() {
     const marcadas = lista.querySelectorAll('input[type=checkbox]:checked').length;
     const total = lista.querySelectorAll('input[type=checkbox]').length;
     modoLabel.textContent = marcadas === 0
-        ? `Toda la cuenta (${total} campañas conocidas)`
-        : `Solo ${marcadas} de ${total} campañas`;
+        ? `Ninguna marcada de ${total} — marcá al menos una`
+        : `${marcadas} de ${total} campañas seleccionadas`;
 }
 
-cuentaSelect.addEventListener('change', () => renderCampanias(cuentaSelect.value));
+cuentaSelect.addEventListener('change', () => alElegirCuenta(cuentaSelect.value));
 lista.addEventListener('change', actualizarModoLabel);
 importarTodo.addEventListener('change', aplicarModoImportarTodo);
 
@@ -231,7 +255,17 @@ document.getElementById('btn-ninguna').addEventListener('click', () => {
     actualizarModoLabel();
 });
 
-document.getElementById('importar-form')?.addEventListener('submit', function () {
+document.getElementById('importar-form')?.addEventListener('submit', function (ev) {
+    // En modo selectivo (importar todo desmarcado) exigimos al menos una campaña,
+    // para que no se dispare una cuenta completa por error.
+    if (!importarTodo.checked) {
+        const marcadas = lista.querySelectorAll('input[type=checkbox]:checked').length;
+        if (marcadas === 0) {
+            ev.preventDefault();
+            alert('Marcá al menos una campaña, o activá "Importar toda la cuenta".');
+            return;
+        }
+    }
     const btn = document.getElementById('importar-btn');
     btn.disabled = true;
     btn.textContent = 'Importando... no cierres esta ventana';

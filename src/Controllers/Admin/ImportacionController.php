@@ -63,6 +63,34 @@ final class ImportacionController
         ]));
     }
 
+    /**
+     * Devuelve JSON con las campañas EN VIVO de una cuenta (consultadas a Meta),
+     * para poblar la lista de selección con campañas nuevas que todavía no se
+     * importaron. Usado por el JS de la pantalla de importación.
+     */
+    public function campaniasEnVivo(Request $request): Response
+    {
+        $cuentaId = (int) $request->input('cuenta_id', 0);
+        if ($cuentaId <= 0) {
+            return Response::json(['error' => 'Cuenta inválida.'], 400);
+        }
+
+        try {
+            $service = $this->container->get(ImportacionService::class);
+            $campanias = $service->listarCampaniasDeMeta($cuentaId);
+
+            return Response::json(['campanias' => $campanias]);
+        } catch (MetaApiException $e) {
+            $msg = $e->esTokenInvalido()
+                ? 'El token de Meta es inválido o expiró. Reconectá la cuenta.'
+                : 'Meta API: ' . $e->getMessage();
+
+            return Response::json(['error' => $msg], 502);
+        } catch (Throwable $e) {
+            return Response::json(['error' => 'No se pudieron cargar las campañas: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function ejecutar(Request $request): Response
     {
         $session = $this->container->get(Session::class);
