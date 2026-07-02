@@ -80,6 +80,34 @@ final class ImportacionService
     ];
 
     /**
+     * effective_status a incluir en los endpoints de listado.
+     *
+     * Por defecto, /campaigns, /adsets y /ads de la Marketing API SOLO devuelven
+     * entidades ACTIVE y PAUSED (excluyen ARCHIVED/DELETED y las que el usuario
+     * percibe como "finalizadas/completadas"). Para importar TODAS las campañas
+     * —incluidas las ya completadas— hay que pasar effective_status explícito con
+     * la lista completa. Los valores válidos difieren por nivel.
+     *
+     * Se envía como json_encode([...]) (Meta espera un array JSON, no CSV).
+     */
+    private const CAMPAIGN_EFFECTIVE_STATUS = [
+        'ACTIVE', 'PAUSED', 'DELETED', 'ARCHIVED',
+        'IN_PROCESS', 'WITH_ISSUES',
+    ];
+
+    private const ADSET_EFFECTIVE_STATUS = [
+        'ACTIVE', 'PAUSED', 'DELETED', 'ARCHIVED',
+        'CAMPAIGN_PAUSED', 'IN_PROCESS', 'WITH_ISSUES',
+    ];
+
+    private const AD_EFFECTIVE_STATUS = [
+        'ACTIVE', 'PAUSED', 'DELETED', 'ARCHIVED',
+        'CAMPAIGN_PAUSED', 'ADSET_PAUSED',
+        'PENDING_REVIEW', 'DISAPPROVED', 'PREAPPROVED',
+        'PENDING_BILLING_INFO', 'IN_PROCESS', 'WITH_ISSUES',
+    ];
+
+    /**
      * Fields del creative que nos interesan para mostrar el anuncio al cliente.
      * Meta los devuelve dentro de `creative{...}` cuando se piden en la query del ad.
      */
@@ -140,6 +168,8 @@ final class ImportacionService
             $campaniasQuery = [
                 'fields' => ['id', 'name', 'objective', 'status', 'start_time', 'stop_time',
                              'daily_budget', 'lifetime_budget'],
+                // Incluye completadas/archivadas: sin esto Meta solo devuelve ACTIVE/PAUSED.
+                'effective_status' => json_encode(self::CAMPAIGN_EFFECTIVE_STATUS),
                 'limit' => 100,
             ];
             if ($filtroActivo) {
@@ -176,6 +206,8 @@ final class ImportacionService
             $adsetsQuery = [
                 'fields' => ['id', 'name', 'campaign_id', 'status', 'targeting',
                              'daily_budget', 'lifetime_budget', 'optimization_goal'],
+                // Incluye adsets de campañas completadas/pausadas/archivadas.
+                'effective_status' => json_encode(self::ADSET_EFFECTIVE_STATUS),
                 'limit' => 100,
             ];
             if ($filtroActivo) {
@@ -216,6 +248,8 @@ final class ImportacionService
                     'id', 'name', 'adset_id', 'campaign_id', 'status', 'preview_shareable_link',
                     $creativeFieldsExpr,
                 ],
+                // Incluye ads de campañas completadas/pausadas/archivadas.
+                'effective_status' => json_encode(self::AD_EFFECTIVE_STATUS),
                 'limit' => 100,
             ];
             if ($filtroActivo) {
