@@ -27,8 +27,14 @@ $esEngagement = in_array($optGoal, ['POST_ENGAGEMENT', 'PAGE_LIKES', 'EVENT_RESP
 // No duplicamos la métrica: si Resultados ya es conversaciones, no mostramos
 // la fila Conversaciones aparte; idem leads. Y para campañas de engagement
 // suprimimos conversaciones aisladas (clicks-to-WA residuales que confunden).
-$mostrarConversaciones = !$esMensajes && !$esLeads && !$esEngagement && !($ocultarConversaciones ?? false);
-$mostrarLeads = !$esLeads && !$esMensajes && !$esEngagement && !($ocultarLeads ?? false);
+// Además: solo mostramos conversaciones/leads si son RELEVANTES al objetivo
+// efectivo del anuncio — Meta reporta acciones colaterales (p. ej. 2
+// conversaciones en awareness) que no son el objetivo y confunden al cliente.
+$objEfectivo = $optGoal !== '' ? $optGoal : $objetivoCam;
+$convEsRelevante = ObjetivoCampania::metricaEsRelevante($objEfectivo, 'conversaciones');
+$leadsEsRelevante = ObjetivoCampania::metricaEsRelevante($objEfectivo, 'leads');
+$mostrarConversaciones = $convEsRelevante && !$esMensajes && !$esLeads && !$esEngagement && !($ocultarConversaciones ?? false);
+$mostrarLeads = $leadsEsRelevante && !$esLeads && !$esMensajes && !$esEngagement && !($ocultarLeads ?? false);
 
 $thumb = (string) ($a['image_url'] ?? $a['thumbnail_url'] ?? '');
 $cuerpo = (string) ($a['cuerpo'] ?? '');

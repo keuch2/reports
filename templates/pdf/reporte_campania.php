@@ -50,16 +50,22 @@ if (((int) ($totales['resultados'] ?? 0)) > 0) {
         $kpis[] = [$labelCostoPorResultado, $mon . ' ' . $fmtMoneda($totales['costo_por_resultado'])];
     }
 }
-if (((int) ($totales['conversaciones'] ?? 0)) > 0 && !$ocultarConversaciones) {
+// Solo métricas secundarias relevantes al objetivo (mismo criterio que la
+// pantalla de detalle): evita mostrar conversaciones/leads/visitas residuales
+// que Meta reporta pero no son el objetivo de la campaña.
+$convRelevante = ObjetivoCampania::metricaEsRelevante($objetivo, 'conversaciones');
+$leadsRelevante = ObjetivoCampania::metricaEsRelevante($objetivo, 'leads');
+$visitasRelevante = ObjetivoCampania::metricaEsRelevante($objetivo, 'visitas');
+if ($convRelevante && ((int) ($totales['conversaciones'] ?? 0)) > 0 && !$ocultarConversaciones) {
     $kpis[] = ['Conversaciones', $fmtNum($totales['conversaciones'])];
     if (isset($totales['costo_por_conversacion']) && $totales['costo_por_conversacion'] !== null) {
         $kpis[] = ['Costo por conversación', $mon . ' ' . $fmtMoneda($totales['costo_por_conversacion'])];
     }
 }
-if (((int) ($totales['leads'] ?? 0)) > 0 && !$ocultarLeads) {
+if ($leadsRelevante && ((int) ($totales['leads'] ?? 0)) > 0 && !$ocultarLeads) {
     $kpis[] = ['Clientes potenciales', $fmtNum($totales['leads'])];
 }
-if (((int) ($totales['landing_page_views'] ?? 0)) > 0) {
+if ($visitasRelevante && !ObjetivoCampania::visitasEsRedundante($objetivo) && ((int) ($totales['landing_page_views'] ?? 0)) > 0) {
     $kpis[] = ['Visitas página', $fmtNum($totales['landing_page_views'])];
 }
 ?>
@@ -112,11 +118,21 @@ if (((int) ($totales['landing_page_views'] ?? 0)) > 0) {
     </tr>
 </table>
 
-<?php if ($resultados_por_tipo !== []): ?>
+<?php
+// Filtrar el desglose por tipo a las métricas relevantes al objetivo.
+$tiposRelevantes = ObjetivoCampania::metricasRelevantes($objetivo);
+$resultadosPorTipoFiltrado = $tiposRelevantes === []
+    ? []
+    : array_values(array_filter(
+        $resultados_por_tipo,
+        static fn ($r) => in_array($r['tipo'], $tiposRelevantes, true)
+    ));
+?>
+<?php if ($resultadosPorTipoFiltrado !== []): ?>
 <h2>Resultados por tipo</h2>
 <table class="kpi-row">
     <tr>
-    <?php foreach ($resultados_por_tipo as $i => $r):
+    <?php foreach ($resultadosPorTipoFiltrado as $i => $r):
         $info = $labelTipo[$r['tipo']] ?? ['plural' => ucfirst($r['tipo']), 'singular' => $r['tipo']];
     ?>
         <td>

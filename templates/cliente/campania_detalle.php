@@ -90,23 +90,41 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                 <div class="kpi"><span class="kpi__label"><?= $view->e($labelCostoPorResultado) ?></span><span class="kpi__value"><?= $view->e($mon) ?> <?= $fmtMoneda($totales['costo_por_resultado']) ?></span></div>
             <?php endif; ?>
         <?php endif; ?>
-        <?php if (((int) ($totales['conversaciones'] ?? 0)) > 0 && !$ocultarConversaciones): ?>
+        <?php
+        // El resultado del objetivo ya se muestra arriba como el KPI de resultados.
+        // Las métricas conversaciones/leads/visitas solo se muestran como KPI aparte
+        // cuando son RELEVANTES al objetivo y NO son ya el resultado (para no duplicar).
+        // Meta reporta acciones colaterales — p. ej. 2 conversaciones en una campana de
+        // awareness — que NO son el objetivo; esas se ocultan para no confundir.
+        ?>
+        <?php if (ObjetivoCampania::metricaEsRelevante($objetivo, 'conversaciones') && !$ocultarConversaciones && ((int) ($totales['conversaciones'] ?? 0)) > 0): ?>
             <div class="kpi"><span class="kpi__label">Conversaciones</span><span class="kpi__value"><?= $fmtNum($totales['conversaciones']) ?></span></div>
             <?php if (isset($totales['costo_por_conversacion']) && $totales['costo_por_conversacion'] !== null): ?>
                 <div class="kpi"><span class="kpi__label">Costo por conversación</span><span class="kpi__value"><?= $view->e($mon) ?> <?= $fmtMoneda($totales['costo_por_conversacion']) ?></span></div>
             <?php endif; ?>
         <?php endif; ?>
-        <?php if (((int) ($totales['leads'] ?? 0)) > 0 && !$ocultarLeads): ?>
+        <?php if (ObjetivoCampania::metricaEsRelevante($objetivo, 'leads') && !$ocultarLeads && ((int) ($totales['leads'] ?? 0)) > 0): ?>
             <div class="kpi"><span class="kpi__label">Clientes potenciales</span><span class="kpi__value"><?= $fmtNum($totales['leads']) ?></span></div>
         <?php endif; ?>
-        <?php if (((int) ($totales['landing_page_views'] ?? 0)) > 0): ?>
+        <?php if (ObjetivoCampania::metricaEsRelevante($objetivo, 'visitas') && !ObjetivoCampania::visitasEsRedundante($objetivo) && ((int) ($totales['landing_page_views'] ?? 0)) > 0): ?>
             <div class="kpi"><span class="kpi__label">Visitas página</span><span class="kpi__value"><?= $fmtNum($totales['landing_page_views']) ?></span></div>
         <?php endif; ?>
     </div>
 
-    <?php if (!empty($resultados_por_tipo ?? [])): ?>
+    <?php
+    // Filtramos el desglose por tipo a las métricas relevantes al objetivo,
+    // para no mostrar tipos residuales (p. ej. conversaciones en awareness).
+    $tiposRelevantes = ObjetivoCampania::metricasRelevantes($objetivo);
+    $resultadosPorTipoFiltrado = $tiposRelevantes === []
+        ? []
+        : array_values(array_filter(
+            $resultados_por_tipo ?? [],
+            static fn ($r) => in_array($r['tipo'], $tiposRelevantes, true)
+        ));
+    ?>
+    <?php if ($resultadosPorTipoFiltrado !== []): ?>
         <?= $view->renderPartial('partials/resultados_por_tipo', [
-            'resultados_por_tipo' => $resultados_por_tipo,
+            'resultados_por_tipo' => $resultadosPorTipoFiltrado,
             'mon' => $mon,
             'fmtMoneda' => $fmtMoneda,
             'fmtNum' => $fmtNum,

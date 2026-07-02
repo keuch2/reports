@@ -89,24 +89,66 @@ final class ObjetivoCampania
     }
 
     /**
-     * Decide si mostrar 'Conversaciones' como métrica separada cuando ya está
-     * cubierta por 'Resultados' (objetivo MESSAGES). Evita duplicar info.
+     * Decide si 'Conversaciones' ya está cubierta por 'Resultados' (objetivo de
+     * mensajería), para no mostrarla dos veces.
      */
     public static function conversacionesEsRedundante(?string $objetivo): bool
     {
-        return $objetivo !== null && strtoupper($objetivo) === 'MESSAGES';
+        return in_array('conversaciones', self::metricasRelevantes($objetivo), true);
     }
 
     /**
-     * Decide si mostrar 'Clientes potenciales' como métrica separada cuando
-     * ya está cubierta por 'Resultados' (objetivo LEAD_GENERATION / OUTCOME_LEADS).
+     * Decide si 'Clientes potenciales' ya está cubierta por 'Resultados'
+     * (objetivo de leads), para no mostrarla dos veces.
      */
     public static function leadsEsRedundante(?string $objetivo): bool
     {
-        return $objetivo !== null && in_array(
-            strtoupper($objetivo),
-            ['LEAD_GENERATION', 'OUTCOME_LEADS'],
-            true
-        );
+        return in_array('leads', self::metricasRelevantes($objetivo), true);
+    }
+
+    /**
+     * Decide si 'Visitas' ya está cubierta por 'Resultados' (objetivo de
+     * tráfico), para no mostrarla dos veces.
+     */
+    public static function visitasEsRedundante(?string $objetivo): bool
+    {
+        return in_array('visitas', self::metricasRelevantes($objetivo), true);
+    }
+
+    /**
+     * Métricas de resultado ("conversaciones", "leads", "interacciones",
+     * "visitas") que son RELEVANTES para el objetivo de la campaña.
+     *
+     * Meta suele reportar acciones colaterales que no son el objetivo (p. ej.
+     * una campaña de AWARENESS puede registrar 2 conversaciones residuales).
+     * Mostrarlas confunde al cliente: el dashboard debe reflejar el objetivo.
+     * Este método define qué métricas tienen sentido según el objetivo; el
+     * resto se oculta como ruido.
+     *
+     * Awareness/alcance/impresiones no tienen métrica secundaria: su resultado
+     * es el Alcance, que ya se muestra como métrica universal.
+     *
+     * @return list<'conversaciones'|'leads'|'interacciones'|'visitas'>
+     */
+    public static function metricasRelevantes(?string $objetivo): array
+    {
+        $o = $objetivo === null ? '' : strtoupper($objetivo);
+
+        return match ($o) {
+            'MESSAGES', 'CONVERSATIONS', 'REPLIES' => ['conversaciones'],
+            'OUTCOME_LEADS', 'LEAD_GENERATION', 'QUALITY_LEAD', 'LEAD' => ['leads'],
+            'OUTCOME_ENGAGEMENT', 'POST_ENGAGEMENT', 'PAGE_LIKES', 'EVENT_RESPONSES' => ['interacciones'],
+            'OUTCOME_TRAFFIC', 'LINK_CLICKS', 'LANDING_PAGE_VIEWS' => ['visitas'],
+            // Awareness, reach, impresiones, video, ventas/conversiones, app:
+            // no tienen una métrica secundaria de mensajería/lead/visita que
+            // mostrar; su resultado es alcance (universal) o se maneja aparte.
+            default => [],
+        };
+    }
+
+    /** ¿La métrica secundaria dada es relevante para el objetivo? */
+    public static function metricaEsRelevante(?string $objetivo, string $metrica): bool
+    {
+        return in_array($metrica, self::metricasRelevantes($objetivo), true);
     }
 }
