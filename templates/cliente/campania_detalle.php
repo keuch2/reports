@@ -13,7 +13,12 @@
 use MisterCo\Reports\Domain\ObjetivoCampania;
 
 $mon = (string) ($campania['moneda'] ?? '');
-$objetivo = (string) ($campania['objetivo'] ?? '');
+// Objetivo EFECTIVO: el optimization_goal del adset gana sobre el objetivo de
+// campaña (igual que Meta). Una campaña OUTCOME_AWARENESS con adsets THRUPLAY
+// reporta "Reproducciones de video", no "Personas alcanzadas".
+$optGoal = (string) ($campania['optimization_goal_predominante'] ?? '');
+$objetivoCampania = (string) ($campania['objetivo'] ?? '');
+$objetivo = (string) (ObjetivoCampania::objetivoEfectivo($optGoal, $objetivoCampania) ?? '');
 $labelResultados = ObjetivoCampania::nombreResultados($objetivo);
 $labelResultadosCorto = ObjetivoCampania::nombreCortoResultados($objetivo);
 $labelCostoPorResultado = 'Costo por ' . mb_strtolower($labelResultadosCorto);

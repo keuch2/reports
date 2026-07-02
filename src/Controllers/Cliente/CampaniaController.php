@@ -84,7 +84,7 @@ final class CampaniaController
         return Response::html($view->render('cliente/campania_detalle', [
             'usuario' => $usuario,
             'titulo' => $cam['nombre'],
-            'campania' => $cam,
+            'campania' => $campaniaConGoal,
             'totales' => $totales,
             'adsets' => $adsets,
             'anuncios_por_adset' => $anunciosPorAdset,

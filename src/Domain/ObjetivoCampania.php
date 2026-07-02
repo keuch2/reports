@@ -70,6 +70,36 @@ final class ObjetivoCampania
         return self::ETIQUETAS[strtoupper($objetivo)] ?? 'Resultados';
     }
 
+    /**
+     * Objetivo EFECTIVO de una campaña: el optimization_goal del adset gana
+     * sobre el objective de la campaña, igual que en Meta Ads Manager.
+     *
+     * Caso típico: una campaña OUTCOME_AWARENESS cuyos adsets optimizan THRUPLAY
+     * reporta "Reproducciones de video", no "Personas alcanzadas". El resultado
+     * y su etiqueta deben reflejar lo que el adset REALMENTE optimiza.
+     *
+     * Sólo se prefiere el optimization_goal cuando tiene una etiqueta conocida;
+     * si no, se cae al objetivo de campaña para no perder significado.
+     */
+    public static function objetivoEfectivo(?string $optimizationGoal, ?string $objetivoCampania): ?string
+    {
+        $og = $optimizationGoal !== null ? strtoupper($optimizationGoal) : '';
+        if ($og !== '' && isset(self::ETIQUETAS[$og])) {
+            return $og;
+        }
+
+        return $objetivoCampania;
+    }
+
+    /**
+     * Nombre de "Resultados" priorizando el optimization_goal del adset sobre
+     * el objetivo de campaña. Atajo de nombreResultados(objetivoEfectivo(...)).
+     */
+    public static function nombreResultadosEfectivo(?string $optimizationGoal, ?string $objetivoCampania): string
+    {
+        return self::nombreResultados(self::objetivoEfectivo($optimizationGoal, $objetivoCampania));
+    }
+
     /** Versión abreviada para columnas estrechas de tabla. */
     public static function nombreCortoResultados(?string $objetivo): string
     {

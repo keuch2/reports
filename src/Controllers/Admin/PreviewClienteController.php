@@ -158,7 +158,7 @@ final class PreviewClienteController
             'usuario' => $request->attributes['usuario'],
             'titulo' => 'Vista previa · ' . $cam['nombre'],
             'cliente' => $cliente,
-            'campania' => $cam,
+            'campania' => $campaniaConGoal,
             'totales' => $totales,
             'adsets' => $adsets,
             'anuncios_por_adset' => $anunciosPorAdset,

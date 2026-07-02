@@ -106,11 +106,19 @@ final class ReportePdfService
         $cliente = $this->buscarCliente($clienteId);
 
         $campania = $this->db->selectOne(
-            'SELECT c.id, c.nombre, c.objetivo, c.estado,
-                    cp.nombre AS cuenta_nombre, cp.moneda
+            "SELECT c.id, c.nombre, c.objetivo, c.estado,
+                    cp.nombre AS cuenta_nombre, cp.moneda,
+                    -- optimization_goal predominante del adset (gana sobre el
+                    -- objetivo de campaña para etiquetar los 'Resultados').
+                    (SELECT cs.optimization_goal
+                       FROM conjuntos_anuncios cs
+                      WHERE cs.campania_id = c.id AND cs.optimization_goal IS NOT NULL
+                   GROUP BY cs.optimization_goal
+                   ORDER BY COUNT(*) DESC
+                      LIMIT 1) AS optimization_goal_predominante
                FROM campanias c
                JOIN cuentas_publicitarias cp ON cp.id = c.cuenta_publicitaria_id
-              WHERE c.id = :id',
+              WHERE c.id = :id",
             ['id' => $campaniaId]
         );
         if ($campania === null) {
