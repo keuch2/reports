@@ -191,19 +191,42 @@ final class EntidadesMetaRepository
     }
 
     /**
-     * Optimization_goal más usado entre los adsets de una campaña. Permite que
-     * los textos descriptivos (análisis) usen la métrica de resultado correcta
-     * cuando una campaña tiene varios adsets con distintos goals.
+     * Optimization_goal PREDOMINANTE de una campaña: el que define la métrica
+     * de "Resultados" y su etiqueta.
+     *
+     * La prioridad replica EXACTAMENTE la del CASE de resultados en
+     * DashboardService::totalesCampania (si algún adset optimiza CONVERSATIONS
+     * el número suma conversaciones; si LEAD_GENERATION, leads; si
+     * POST_ENGAGEMENT/PAGE_LIKES/EVENT_RESPONSES, interacciones) — así el label
+     * y el número siempre cuentan lo mismo. Los goals de entrega genéricos
+     * (REACH, IMPRESSIONS, AD_RECALL_LIFT) solo definen la métrica si no hay
+     * ningún goal con métrica específica; entre goals del mismo rango decide
+     * el gasto real y luego la cantidad de adsets.
+     *
+     * Caso real: campaña de interacciones con 6 adsets REACH (87% del gasto) y
+     * 2 POST_ENGAGEMENT — el número que se muestra son las interacciones, así
+     * que el label debe ser "Interacciones", no "Personas alcanzadas".
      */
     public function optimizationGoalPredominante(int $campaniaId): ?string
     {
         $row = $this->db->selectOne(
-            'SELECT optimization_goal, COUNT(*) AS n
-               FROM conjuntos_anuncios
-              WHERE campania_id = :c AND optimization_goal IS NOT NULL
-           GROUP BY optimization_goal
-           ORDER BY n DESC
-              LIMIT 1',
+            "SELECT cs.optimization_goal,
+                    CASE
+                        WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') THEN 1
+                        WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') THEN 2
+                        WHEN cs.optimization_goal IN ('POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN 3
+                        WHEN cs.optimization_goal IN ('REACH','IMPRESSIONS','AD_RECALL_LIFT') THEN 9
+                        ELSE 5
+                    END AS prioridad,
+                    COALESCE(SUM(ms.gasto), 0) AS gasto,
+                    COUNT(DISTINCT cs.id) AS n
+               FROM conjuntos_anuncios cs
+          LEFT JOIN anuncios a ON a.conjunto_anuncios_id = cs.id
+          LEFT JOIN metricas_snapshots ms ON ms.entidad_id = a.id AND ms.nivel = 'ad'
+              WHERE cs.campania_id = :c AND cs.optimization_goal IS NOT NULL
+           GROUP BY cs.optimization_goal
+           ORDER BY prioridad ASC, gasto DESC, n DESC
+              LIMIT 1",
             ['c' => $campaniaId]
         );
         return $row !== null ? (string) $row['optimization_goal'] : null;

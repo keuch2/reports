@@ -108,13 +108,25 @@ final class ReportePdfService
         $campania = $this->db->selectOne(
             "SELECT c.id, c.nombre, c.objetivo, c.estado,
                     cp.nombre AS cuenta_nombre, cp.moneda,
-                    -- optimization_goal predominante del adset (gana sobre el
-                    -- objetivo de campaña para etiquetar los 'Resultados').
+                    -- optimization_goal predominante con la MISMA prioridad que el
+                    -- CASE de resultados de DashboardService::totalesCampania, para
+                    -- que el label del PDF cuente lo mismo que el número (ver
+                    -- EntidadesMetaRepository::optimizationGoalPredominante).
                     (SELECT cs.optimization_goal
                        FROM conjuntos_anuncios cs
+                  LEFT JOIN anuncios a ON a.conjunto_anuncios_id = cs.id
+                  LEFT JOIN metricas_snapshots ms ON ms.entidad_id = a.id AND ms.nivel = 'ad'
                       WHERE cs.campania_id = c.id AND cs.optimization_goal IS NOT NULL
                    GROUP BY cs.optimization_goal
-                   ORDER BY COUNT(*) DESC
+                   ORDER BY CASE
+                                WHEN cs.optimization_goal IN ('CONVERSATIONS','REPLIES') THEN 1
+                                WHEN cs.optimization_goal IN ('LEAD_GENERATION','QUALITY_LEAD','LEAD') THEN 2
+                                WHEN cs.optimization_goal IN ('POST_ENGAGEMENT','PAGE_LIKES','EVENT_RESPONSES') THEN 3
+                                WHEN cs.optimization_goal IN ('REACH','IMPRESSIONS','AD_RECALL_LIFT') THEN 9
+                                ELSE 5
+                            END ASC,
+                            COALESCE(SUM(ms.gasto), 0) DESC,
+                            COUNT(DISTINCT cs.id) DESC
                       LIMIT 1) AS optimization_goal_predominante
                FROM campanias c
                JOIN cuentas_publicitarias cp ON cp.id = c.cuenta_publicitaria_id
