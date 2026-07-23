@@ -164,12 +164,18 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
                 </thead>
                 <tbody>
                 <?php foreach ($adsets as $g):
-                    $sublabelSrc = $g['optimization_goal'] ?: ($g['objetivo_campania'] ?? $objetivo);
+                    // Objetivo efectivo POR FILA: goals genéricos (REACH/IMPRESSIONS)
+                    // caen al objetivo de campaña — igual que el CASE que calcula
+                    // el número de resultados, para que label y número coincidan.
+                    $sublabelSrc = ObjetivoCampania::objetivoEfectivo(
+                        (string) ($g['optimization_goal'] ?? ''),
+                        (string) ($g['objetivo_campania'] ?? $objetivoCampania)
+                    );
                     $labelCorto = ObjetivoCampania::nombreCortoResultados((string) $sublabelSrc);
                 ?>
                     <tr>
                         <td><strong><?= $view->e((string) $g['adset_nombre']) ?></strong>
-                            <?php if ($g['optimization_goal']): ?>
+                            <?php if ($g['optimization_goal'] && !ObjetivoCampania::esGoalGenerico((string) $g['optimization_goal'])): ?>
                                 <br><small class="muted"><?= $view->e((string) $g['optimization_goal']) ?></small>
                             <?php endif; ?>
                         </td>

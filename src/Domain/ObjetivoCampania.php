@@ -71,6 +71,22 @@ final class ObjetivoCampania
     }
 
     /**
+     * Goals de ENTREGA genéricos: dicen cómo Meta reparte el presupuesto pero
+     * no definen una métrica de resultado propia de la campaña. Las queries de
+     * resultados (DashboardService) tampoco los usan: para estos goals el
+     * número cae al objetivo de la campaña. El label debe hacer lo mismo, o
+     * termina diciendo "alcance: 159" cuando 159 son interacciones.
+     */
+    private const GOALS_ENTREGA_GENERICOS = ['REACH', 'IMPRESSIONS', 'AD_RECALL_LIFT'];
+
+    /** ¿Es un goal de entrega genérico (no define métrica de resultado)? */
+    public static function esGoalGenerico(?string $optimizationGoal): bool
+    {
+        return $optimizationGoal !== null
+            && in_array(strtoupper($optimizationGoal), self::GOALS_ENTREGA_GENERICOS, true);
+    }
+
+    /**
      * Objetivo EFECTIVO de una campaña: el optimization_goal del adset gana
      * sobre el objective de la campaña, igual que en Meta Ads Manager.
      *
@@ -78,13 +94,18 @@ final class ObjetivoCampania
      * reporta "Reproducciones de video", no "Personas alcanzadas". El resultado
      * y su etiqueta deben reflejar lo que el adset REALMENTE optimiza.
      *
-     * Sólo se prefiere el optimization_goal cuando tiene una etiqueta conocida;
-     * si no, se cae al objetivo de campaña para no perder significado.
+     * Excepciones (caen al objetivo de campaña):
+     * - optimization_goal sin etiqueta conocida.
+     * - goals de entrega genéricos (REACH/IMPRESSIONS/AD_RECALL_LIFT): un adset
+     *   REACH bajo una campaña de interacciones sigue reportando interacciones
+     *   — que es lo que las queries de resultados suman para ese caso.
      */
     public static function objetivoEfectivo(?string $optimizationGoal, ?string $objetivoCampania): ?string
     {
         $og = $optimizationGoal !== null ? strtoupper($optimizationGoal) : '';
-        if ($og !== '' && isset(self::ETIQUETAS[$og])) {
+        $hayObjetivo = $objetivoCampania !== null && $objetivoCampania !== '';
+
+        if ($og !== '' && isset(self::ETIQUETAS[$og]) && (!self::esGoalGenerico($og) || !$hayObjetivo)) {
             return $og;
         }
 

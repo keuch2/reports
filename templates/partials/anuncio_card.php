@@ -30,7 +30,8 @@ $esEngagement = in_array($optGoal, ['POST_ENGAGEMENT', 'PAGE_LIKES', 'EVENT_RESP
 // Además: solo mostramos conversaciones/leads si son RELEVANTES al objetivo
 // efectivo del anuncio — Meta reporta acciones colaterales (p. ej. 2
 // conversaciones en awareness) que no son el objetivo y confunden al cliente.
-$objEfectivo = $optGoal !== '' ? $optGoal : $objetivoCam;
+// objetivoEfectivo: goals genéricos (REACH/IMPRESSIONS) caen al objetivo de campaña.
+$objEfectivo = (string) ObjetivoCampania::objetivoEfectivo($optGoal, $objetivoCam);
 $convEsRelevante = ObjetivoCampania::metricaEsRelevante($objEfectivo, 'conversaciones');
 $leadsEsRelevante = ObjetivoCampania::metricaEsRelevante($objEfectivo, 'leads');
 $mostrarConversaciones = $convEsRelevante && !$esMensajes && !$esLeads && !$esEngagement && !($ocultarConversaciones ?? false);

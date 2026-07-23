@@ -191,7 +191,12 @@ $resultadosPorTipoFiltrado = $tiposRelevantes === []
         </thead>
         <tbody>
         <?php foreach ($adsets as $g):
-            $sublabelSrc = $g['optimization_goal'] ?: ($g['objetivo_campania'] ?? $objetivo);
+            // Objetivo efectivo POR FILA: goals genéricos (REACH/IMPRESSIONS)
+            // caen al objetivo de campaña — igual que el CASE del número.
+            $sublabelSrc = ObjetivoCampania::objetivoEfectivo(
+                (string) ($g['optimization_goal'] ?? ''),
+                (string) ($g['objetivo_campania'] ?? $objetivoCampania)
+            );
             $labelCorto = ObjetivoCampania::nombreCortoResultados((string) $sublabelSrc);
         ?>
             <tr>
