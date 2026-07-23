@@ -52,13 +52,12 @@ $tipoLabel = match ($tipo) {
     default => 'Anuncio',
 };
 
-// Etiqueta de Resultados: prioriza optimization_goal del adset (lo que se
-// está optimizando), fallback al objetivo de la campaña.
-$labelAdset = $optGoal !== ''
-    ? ObjetivoCampania::nombreCortoResultados($optGoal)
-    : ($objetivoCam !== ''
-        ? ObjetivoCampania::nombreCortoResultados($objetivoCam)
-        : ($labelResultadosCorto ?? 'Resultados'));
+// Etiqueta de Resultados: usa el objetivo EFECTIVO ya calculado arriba (los
+// goals genéricos como REACH caen al objetivo de campaña, igual que el CASE
+// que calcula el número — así "159" se etiqueta interacciones, no alcance).
+$labelAdset = $objEfectivo !== ''
+    ? ObjetivoCampania::nombreCortoResultados($objEfectivo)
+    : ($labelResultadosCorto ?? 'Resultados');
 $labelCortoLower = mb_strtolower($labelAdset);
 ?>
 <article class="ad-card">
@@ -159,7 +158,9 @@ $labelCortoLower = mb_strtolower($labelAdset);
                             <th></th><td></td>
                         <?php endif; ?>
                     </tr>
-                <?php elseif (((int) ($a['landing_page_views'] ?? 0)) > 0): ?>
+                <?php elseif (ObjetivoCampania::metricaEsRelevante($objEfectivo, 'visitas')
+                    && !ObjetivoCampania::visitasEsRedundante($objEfectivo)
+                    && ((int) ($a['landing_page_views'] ?? 0)) > 0): ?>
                     <tr>
                         <th>Visitas pág.</th>
                         <td><?= $fmtNum($a['landing_page_views']) ?></td>
