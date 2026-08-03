@@ -13,6 +13,7 @@ use MisterCo\Reports\Repositories\ConfiguracionRepository;
 final class MetaTokenService
 {
     private const CLAVE_TOKEN = 'meta.system_user_token';
+    private const CLAVE_VENCIMIENTO = 'meta.token_expira_en';
 
     public function __construct(
         private readonly ConfiguracionRepository $config,
@@ -33,11 +34,49 @@ final class MetaTokenService
     public function guardarToken(string $token, int $usuarioId): void
     {
         $this->config->set(self::CLAVE_TOKEN, $token, $usuarioId);
+        // Un token pegado a mano (System User) no vence: limpiamos cualquier
+        // vencimiento previo de una conexión OAuth.
+        $this->config->delete(self::CLAVE_VENCIMIENTO);
+    }
+
+    /** Guarda un token OAuth de larga duración junto con su fecha de vencimiento. */
+    public function guardarTokenConVencimiento(string $token, int $usuarioId, ?\DateTimeImmutable $expiraEn): void
+    {
+        $this->config->set(self::CLAVE_TOKEN, $token, $usuarioId);
+        if ($expiraEn !== null) {
+            $this->config->set(self::CLAVE_VENCIMIENTO, $expiraEn->format('Y-m-d H:i:s'), $usuarioId);
+        } else {
+            $this->config->delete(self::CLAVE_VENCIMIENTO);
+        }
+    }
+
+    /** Fecha de vencimiento del token (solo conexiones OAuth), null si no vence. */
+    public function venceEn(): ?\DateTimeImmutable
+    {
+        $valor = $this->config->get(self::CLAVE_VENCIMIENTO);
+        if ($valor === null) {
+            return null;
+        }
+        $fecha = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $valor);
+
+        return $fecha === false ? null : $fecha;
+    }
+
+    /** Días que faltan para el vencimiento; null si el token no vence. Negativo = vencido. */
+    public function diasHastaVencimiento(): ?int
+    {
+        $vence = $this->venceEn();
+        if ($vence === null) {
+            return null;
+        }
+
+        return (int) floor(($vence->getTimestamp() - time()) / 86400);
     }
 
     public function borrarToken(): void
     {
         $this->config->delete(self::CLAVE_TOKEN);
+        $this->config->delete(self::CLAVE_VENCIMIENTO);
     }
 
     public function cliente(): MetaApiClient

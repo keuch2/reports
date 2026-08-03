@@ -55,6 +55,8 @@ return function (Router $router): void {
     $router->get('/admin', [HomeController::class, 'admin'], $admin);
 
     $router->get('/admin/meta', [MetaConexionController::class, 'mostrar'], $admin);
+    $router->get('/admin/meta/oauth/iniciar', [MetaConexionController::class, 'oauthIniciar'], $admin);
+    $router->get('/admin/meta/oauth/callback', [MetaConexionController::class, 'oauthCallback'], $admin);
     $router->post('/admin/meta/conectar', [MetaConexionController::class, 'conectar'], $adminCsrf);
     $router->post('/admin/meta/desconectar', [MetaConexionController::class, 'desconectar'], $adminCsrf);
 

@@ -20,6 +20,7 @@ use MisterCo\Reports\Services\DashboardPreferenciasService;
 use MisterCo\Reports\Services\AnalisisCampaniaService;
 use MisterCo\Reports\Services\DashboardService;
 use MisterCo\Reports\Services\Meta\ImportacionService;
+use MisterCo\Reports\Services\Meta\MetaOAuthService;
 use MisterCo\Reports\Services\Meta\MetaTokenService;
 use MisterCo\Reports\Services\PasswordPolicyService;
 use MisterCo\Reports\Services\PasswordResetService;
@@ -81,6 +82,12 @@ final class Application
         $container->bind(MetaTokenService::class, fn (Container $c) => new MetaTokenService(
             $c->get(ConfiguracionRepository::class),
             (string) ($_ENV['META_API_VERSION'] ?? 'v20.0'),
+        ));
+        $container->bind(MetaOAuthService::class, fn () => new MetaOAuthService(
+            (string) ($_ENV['META_APP_ID'] ?? ''),
+            (string) ($_ENV['META_APP_SECRET'] ?? ''),
+            (string) ($_ENV['META_API_VERSION'] ?? 'v20.0'),
+            (string) $appConfig['url'],
         ));
 
         // Repositorios
