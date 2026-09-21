@@ -8,6 +8,7 @@ use MisterCo\Reports\Core\Container;
 use MisterCo\Reports\Core\Request;
 use MisterCo\Reports\Core\Response;
 use MisterCo\Reports\Core\View;
+use MisterCo\Reports\Domain\PeriodoReporte;
 use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Services\DashboardPreferenciasService;
 use MisterCo\Reports\Services\DashboardService;
@@ -45,15 +46,9 @@ final class DashboardController
         }
 
         $mesesDisponibles = $service->mesesConDatosDelCliente($clienteId);
-        $mesSeleccionado = $this->resolverMes((string) $request->input('mes', ''), $mesesDisponibles);
-        if ($mesSeleccionado === null) {
-            $desde = date('Y-m-01');
-            $hasta = date('Y-m-t');
-        } else {
-            $ts = strtotime($mesSeleccionado . '-01');
-            $desde = date('Y-m-01', $ts);
-            $hasta = date('Y-m-t', $ts);
-        }
+        $periodo = PeriodoReporte::desdeRequest($request, $mesesDisponibles);
+        $desde = $periodo->desde;
+        $hasta = $periodo->hasta;
 
         $totales = $service->totalesGlobales($clienteId, $desde, $hasta);
         $campanias = $service->porCampania($clienteId, $desde, $hasta);
@@ -78,7 +73,7 @@ final class DashboardController
             'moneda' => $monedaPredominante,
             'desde' => $desde,
             'hasta' => $hasta,
-            'mes_seleccionado' => $mesSeleccionado,
+            'periodo' => $periodo,
             'meses_disponibles' => $mesesDisponibles,
             'totales' => $totales,
             'campanias' => $campanias,
@@ -88,17 +83,5 @@ final class DashboardController
             'widgets_disponibles' => DashboardPreferenciasService::WIDGETS_DISPONIBLES,
             'metricas_deshabilitadas' => $deshabilitadas,
         ]));
-    }
-
-    /** @param list<string> $disponibles */
-    private function resolverMes(string $mes, array $disponibles): ?string
-    {
-        if ($disponibles === []) {
-            return null;
-        }
-        if ($mes !== '' && in_array($mes, $disponibles, true)) {
-            return $mes;
-        }
-        return $disponibles[0];
     }
 }

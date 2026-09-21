@@ -8,6 +8,7 @@ use MisterCo\Reports\Core\Container;
 use MisterCo\Reports\Core\Request;
 use MisterCo\Reports\Core\Response;
 use MisterCo\Reports\Core\View;
+use MisterCo\Reports\Domain\PeriodoReporte;
 use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\EntidadesMetaRepository;
 use MisterCo\Reports\Services\AnalisisCampaniaService;
@@ -40,14 +41,9 @@ final class CampaniaController
         }
 
         $mesesDisponibles = $entidades->mesesConDatosDeCampania($campaniaId);
-        $mesSeleccionado = $this->resolverMes((string) $request->input('mes', ''), $mesesDisponibles);
-        if ($mesSeleccionado === null) {
-            // Campaña sin snapshots — devuelve detalle vacío pero válido.
-            $desde = date('Y-m-01');
-            $hasta = date('Y-m-t');
-        } else {
-            [$desde, $hasta] = $this->rangoDelMes($mesSeleccionado);
-        }
+        $periodo = PeriodoReporte::desdeRequest($request, $mesesDisponibles);
+        $desde = $periodo->desde;
+        $hasta = $periodo->hasta;
 
         $totales = $dashboard->totalesCampania($clienteId, $campaniaId, $desde, $hasta);
         $adsets = $dashboard->adsetsDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta);
@@ -90,35 +86,11 @@ final class CampaniaController
             'anuncios_por_adset' => $anunciosPorAdset,
             'desde' => $desde,
             'hasta' => $hasta,
-            'mes_seleccionado' => $mesSeleccionado,
+            'periodo' => $periodo,
             'meses_disponibles' => $mesesDisponibles,
             'analisis' => $analisis,
             'evolucion' => $evolucion,
             'resultados_por_tipo' => $resultadosPorTipo,
         ]));
-    }
-
-    /**
-     * Si el mes pedido (YYYY-MM) está en la lista de disponibles lo usa.
-     * Si no, devuelve el más reciente, o null si no hay datos.
-     *
-     * @param list<string> $disponibles
-     */
-    private function resolverMes(string $mes, array $disponibles): ?string
-    {
-        if ($disponibles === []) {
-            return null;
-        }
-        if ($mes !== '' && in_array($mes, $disponibles, true)) {
-            return $mes;
-        }
-        return $disponibles[0];
-    }
-
-    /** @return array{0:string,1:string} */
-    private function rangoDelMes(string $yyyymm): array
-    {
-        $ts = strtotime($yyyymm . '-01');
-        return [date('Y-m-01', $ts), date('Y-m-t', $ts)];
     }
 }

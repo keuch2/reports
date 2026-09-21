@@ -5,7 +5,7 @@
 /** @var string $moneda */
 /** @var string $desde */
 /** @var string $hasta */
-/** @var string|null $mes_seleccionado */
+/** @var \MisterCo\Reports\Domain\PeriodoReporte $periodo */
 /** @var list<string> $meses_disponibles */
 /** @var array<string,mixed> $totales */
 /** @var list<array<string,mixed>> $campanias */
@@ -41,34 +41,15 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
         </div>
     </div>
 
-    <?php
-    $mesesNombre = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-    $formatMes = static function (string $yyyymm) use ($mesesNombre): string {
-        $partes = explode('-', $yyyymm);
-        if (count($partes) !== 2) return $yyyymm;
-        $mes = (int) $partes[1];
-        return ucfirst($mesesNombre[$mes - 1] ?? '') . ' ' . $partes[0];
-    };
-    ?>
     <?php if ($meses_disponibles === []): ?>
         <p class="muted">Aún no hay datos importados para tus campañas.</p>
     <?php else: ?>
-        <form method="GET" action="<?= $view->url('/cliente') ?>" class="dashboard-filters">
-            <label class="field">
-                <span class="field__label">Mes</span>
-                <select class="field__input" name="mes" onchange="this.form.submit()">
-                    <?php foreach ($meses_disponibles as $m): ?>
-                        <option value="<?= $view->e($m) ?>" <?= $m === $mes_seleccionado ? 'selected' : '' ?>>
-                            <?= $view->e($formatMes($m)) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <span class="muted" style="align-self:center"><?= $view->e($desde) ?> → <?= $view->e($hasta) ?></span>
-
-            <a href="<?= $view->url('/cliente/reporte/previa?mes=' . $view->e((string) $mes_seleccionado) . '&desde=' . $view->e($desde) . '&hasta=' . $view->e($hasta)) ?>"
-               class="btn btn--primary">📄 Exportar PDF</a>
-        </form>
+        <?= $view->renderPartial('partials/filtro_periodo', [
+            'action' => $view->url('/cliente'),
+            'periodo' => $periodo,
+            'meses_disponibles' => $meses_disponibles,
+            'exportar' => ['metodo' => 'get', 'url' => $view->url('/cliente/reporte/previa')],
+        ]) ?>
     <?php endif; ?>
 
     <div class="kpi-grid">
@@ -126,7 +107,7 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
                 <tbody>
                 <?php foreach ($campanias as $c): ?>
                     <tr>
-                        <td><a href="<?= $view->url('/cliente/campanias/' . ((int) $c['campania_id'])) ?>"><?= $view->e((string) $c['campania']) ?></a></td>
+                        <td><a href="<?= $view->e($view->url('/cliente/campanias/' . ((int) $c['campania_id'])) . '?' . $periodo->query()) ?>"><?= $view->e((string) $c['campania']) ?></a></td>
                         <td><small class="muted"><?= $view->e((string) ($c['cuenta_nombre'] ?? '')) ?></small></td>
                         <td><?= $view->e((string) ($c['estado'] ?? '—')) ?></td>
                         <td class="num"><?= $view->e((string) ($c['moneda'] ?? '')) ?> <?= $fmtMoneda($c['gasto']) ?></td>

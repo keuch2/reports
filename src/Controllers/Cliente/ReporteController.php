@@ -8,6 +8,7 @@ use MisterCo\Reports\Core\Container;
 use MisterCo\Reports\Core\Request;
 use MisterCo\Reports\Core\Response;
 use MisterCo\Reports\Core\View;
+use MisterCo\Reports\Domain\PeriodoReporte;
 use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\EntidadesMetaRepository;
 use MisterCo\Reports\Repositories\PlantillaPdfRepository;
@@ -34,8 +35,7 @@ final class ReporteController
         }
 
         $mesesDisponibles = $dashboard->mesesConDatosDelCliente($clienteId);
-        $mesSeleccionado = $this->resolverMes((string) $request->input('mes', ''), $mesesDisponibles);
-        [$desde, $hasta] = $this->resolverRango($request, $mesSeleccionado);
+        $periodo = PeriodoReporte::desdeRequest($request, $mesesDisponibles);
 
         $view = $this->container->get(View::class);
 
@@ -43,9 +43,7 @@ final class ReporteController
             'usuario' => $usuario,
             'titulo' => 'Generar reporte',
             'meses_disponibles' => $mesesDisponibles,
-            'mes_seleccionado' => $mesSeleccionado,
-            'desde' => $desde,
-            'hasta' => $hasta,
+            'periodo' => $periodo,
         ]));
     }
 
@@ -60,11 +58,8 @@ final class ReporteController
             return Response::html('<h1>403 — No tenés campañas asignadas.</h1>', 403);
         }
 
-        $mesSeleccionado = $this->resolverMes(
-            (string) $request->input('mes', ''),
-            $dashboard->mesesConDatosDelCliente($clienteId)
-        );
-        [$desde, $hasta] = $this->resolverRango($request, $mesSeleccionado);
+        $periodo = PeriodoReporte::desdeRequest($request, $dashboard->mesesConDatosDelCliente($clienteId));
+        [$desde, $hasta] = [$periodo->desde, $periodo->hasta];
 
         $comentarios = trim((string) $request->input('comentarios', ''));
         $marcaDeAgua = filter_var($request->input('marca_de_agua', false), FILTER_VALIDATE_BOOLEAN);
@@ -83,7 +78,7 @@ final class ReporteController
             ['rango' => "{$desde} a {$hasta}", 'tamanio' => $pdf['tamanio'] ?? 0]
         );
 
-        return $this->responderPdf($pdf);
+        return Response::pdf($pdf);
     }
 
     public function descargarCampania(Request $request): Response
@@ -99,11 +94,8 @@ final class ReporteController
         }
 
         $entidades = $this->container->get(EntidadesMetaRepository::class);
-        $mesSeleccionado = $this->resolverMes(
-            (string) $request->input('mes', ''),
-            $entidades->mesesConDatosDeCampania($campaniaId)
-        );
-        [$desde, $hasta] = $this->resolverRango($request, $mesSeleccionado);
+        $periodo = PeriodoReporte::desdeRequest($request, $entidades->mesesConDatosDeCampania($campaniaId));
+        [$desde, $hasta] = [$periodo->desde, $periodo->hasta];
 
         $comentarios = trim((string) $request->input('comentarios', ''));
         $marcaDeAgua = filter_var($request->input('marca_de_agua', false), FILTER_VALIDATE_BOOLEAN);
@@ -118,65 +110,6 @@ final class ReporteController
             ['campania_id' => $campaniaId, 'rango' => "{$desde} a {$hasta}", 'tamanio' => $pdf['tamanio'] ?? 0]
         );
 
-        return $this->responderPdf($pdf);
-    }
-
-    /**
-     * @param array{ruta:string, nombre:string, tamanio:int} $pdf
-     */
-    private function responderPdf(array $pdf): Response
-    {
-        $contenido = (string) file_get_contents($pdf['ruta']);
-
-        return new Response(
-            body: $contenido,
-            status: 200,
-            headers: [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $pdf['nombre'] . '"',
-                'Content-Length' => (string) strlen($contenido),
-                'Cache-Control' => 'private, no-store',
-            ]
-        );
-    }
-
-    /**
-     * Resuelve el rango de fechas igual que el dashboard: si llega un rango
-     * personalizado (desde/hasta) válido, lo respeta; si no, usa el mes
-     * calendario completo del mes seleccionado (YYYY-MM). Si tampoco hay mes,
-     * cae al mes actual. Así el PDF SIEMPRE cubre el mismo período que la
-     * pantalla desde la que se exportó.
-     *
-     * @return array{0:string,1:string}
-     */
-    private function resolverRango(Request $request, ?string $mesSeleccionado): array
-    {
-        $desdeInput = (string) $request->input('desde', '');
-        $hastaInput = (string) $request->input('hasta', '');
-        $fecha = '/^\d{4}-\d{2}-\d{2}$/';
-        if (preg_match($fecha, $desdeInput) && preg_match($fecha, $hastaInput)) {
-            return [$desdeInput, $hastaInput];
-        }
-
-        $ts = $mesSeleccionado !== null ? strtotime($mesSeleccionado . '-01') : time();
-
-        return [date('Y-m-01', $ts), date('Y-m-t', $ts)];
-    }
-
-    /**
-     * Si el mes pedido (YYYY-MM) está disponible lo usa; si no, el más reciente;
-     * null si el cliente/campaña no tiene meses con datos.
-     *
-     * @param list<string> $disponibles
-     */
-    private function resolverMes(string $mes, array $disponibles): ?string
-    {
-        if ($disponibles === []) {
-            return null;
-        }
-        if ($mes !== '' && in_array($mes, $disponibles, true)) {
-            return $mes;
-        }
-        return $disponibles[0];
+        return Response::pdf($pdf);
     }
 }

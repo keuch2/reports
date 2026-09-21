@@ -8,6 +8,7 @@ use MisterCo\Reports\Core\Container;
 use MisterCo\Reports\Core\Request;
 use MisterCo\Reports\Core\Response;
 use MisterCo\Reports\Core\View;
+use MisterCo\Reports\Domain\PeriodoReporte;
 use MisterCo\Reports\Repositories\ClienteRepository;
 use MisterCo\Reports\Repositories\EntidadesMetaRepository;
 use MisterCo\Reports\Services\AnalisisCampaniaService;
@@ -22,8 +23,9 @@ use MisterCo\Reports\Services\PermisosService;
  * reglas de permisos), pero con header admin y banner indicando que es preview.
  * No toca sesión, no impersona — el admin sigue siendo admin.
  *
- * Solo lectura: no se exponen acciones del cliente (cambiar preferencias,
- * exportar PDF firmado como el cliente, etc).
+ * Solo lectura sobre los datos del cliente (no cambia sus preferencias). El
+ * admin tiene los mismos filtros de período y exportación a PDF que el cliente;
+ * los PDF se generan en ReporteClienteController a nombre del admin.
  */
 final class PreviewClienteController
 {
@@ -46,15 +48,9 @@ final class PreviewClienteController
         $campaniasAsignadas = $service->campaniasDelCliente($clienteId);
 
         $mesesDisponibles = $service->mesesConDatosDelCliente($clienteId);
-        $mesSeleccionado = $this->resolverMes((string) $request->input('mes', ''), $mesesDisponibles);
-        if ($mesSeleccionado === null) {
-            $desde = date('Y-m-01');
-            $hasta = date('Y-m-t');
-        } else {
-            $ts = strtotime($mesSeleccionado . '-01');
-            $desde = date('Y-m-01', $ts);
-            $hasta = date('Y-m-t', $ts);
-        }
+        $periodo = PeriodoReporte::desdeRequest($request, $mesesDisponibles);
+        $desde = $periodo->desde;
+        $hasta = $periodo->hasta;
 
         $totales = $campaniasAsignadas === [] ? [] : $service->totalesGlobales($clienteId, $desde, $hasta);
         $campanias = $campaniasAsignadas === [] ? [] : $service->porCampania($clienteId, $desde, $hasta);
@@ -78,7 +74,7 @@ final class PreviewClienteController
             'moneda' => $moneda,
             'desde' => $desde,
             'hasta' => $hasta,
-            'mes_seleccionado' => $mesSeleccionado,
+            'periodo' => $periodo,
             'meses_disponibles' => $mesesDisponibles,
             'totales' => $totales,
             'campanias' => $campanias,
@@ -113,15 +109,9 @@ final class PreviewClienteController
         }
 
         $mesesDisponibles = $entidades->mesesConDatosDeCampania($campaniaId);
-        $mesSeleccionado = $this->resolverMes((string) $request->input('mes', ''), $mesesDisponibles);
-        if ($mesSeleccionado === null) {
-            $desde = date('Y-m-01');
-            $hasta = date('Y-m-t');
-        } else {
-            $ts = strtotime($mesSeleccionado . '-01');
-            $desde = date('Y-m-01', $ts);
-            $hasta = date('Y-m-t', $ts);
-        }
+        $periodo = PeriodoReporte::desdeRequest($request, $mesesDisponibles);
+        $desde = $periodo->desde;
+        $hasta = $periodo->hasta;
 
         $totales = $service->totalesCampania($clienteId, $campaniaId, $desde, $hasta);
         $adsets = $service->adsetsDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta);
@@ -164,48 +154,11 @@ final class PreviewClienteController
             'anuncios_por_adset' => $anunciosPorAdset,
             'desde' => $desde,
             'hasta' => $hasta,
-            'mes_seleccionado' => $mesSeleccionado,
+            'periodo' => $periodo,
             'meses_disponibles' => $mesesDisponibles,
             'analisis' => $analisis,
             'evolucion' => $evolucion,
             'resultados_por_tipo' => $resultadosPorTipo,
         ]));
-    }
-
-    /** @param list<string> $disponibles */
-    private function resolverMes(string $mes, array $disponibles): ?string
-    {
-        if ($disponibles === []) {
-            return null;
-        }
-        if ($mes !== '' && in_array($mes, $disponibles, true)) {
-            return $mes;
-        }
-        return $disponibles[0];
-    }
-
-    /** @return array{0:string,1:string,2:string} */
-    private function resolverRango(string $preset, string $desdeInput = '', string $hastaInput = ''): array
-    {
-        $hoy = date('Y-m-d');
-        $presets = [
-            'hoy' => [$hoy, $hoy],
-            'ayer' => [date('Y-m-d', strtotime('-1 day')), date('Y-m-d', strtotime('-1 day'))],
-            'ultimos_7_dias' => [date('Y-m-d', strtotime('-7 days')), $hoy],
-            'ultimos_30_dias' => [date('Y-m-d', strtotime('-30 days')), $hoy],
-            'mes_actual' => [date('Y-m-01'), $hoy],
-            'mes_pasado' => [date('Y-m-01', strtotime('first day of last month')), date('Y-m-t', strtotime('last day of last month'))],
-        ];
-
-        if ($preset === 'personalizado'
-            && preg_match('/^\d{4}-\d{2}-\d{2}$/', $desdeInput)
-            && preg_match('/^\d{4}-\d{2}-\d{2}$/', $hastaInput)
-        ) {
-            return [$desdeInput, $hastaInput, 'personalizado'];
-        }
-
-        $r = $presets[$preset] ?? $presets['ultimos_30_dias'];
-
-        return [$r[0], $r[1], array_key_exists($preset, $presets) ? $preset : 'ultimos_30_dias'];
     }
 }

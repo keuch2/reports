@@ -36,6 +36,23 @@ final class Response
     }
 
     /**
+     * Descarga de un PDF ya generado en disco (ver ReportePdfService).
+     *
+     * @param array{ruta:string, nombre:string, tamanio:int} $pdf
+     */
+    public static function pdf(array $pdf): self
+    {
+        $contenido = (string) file_get_contents($pdf['ruta']);
+
+        return new self($contenido, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $pdf['nombre'] . '"',
+            'Content-Length' => (string) strlen($contenido),
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    /**
      * Redirect. Si $url empieza con "/" se prepende automáticamente APP_PATH_PREFIX.
      * URLs absolutas (http://...) no se modifican.
      */

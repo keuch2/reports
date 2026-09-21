@@ -8,7 +8,7 @@
 /** @var array<int, list<array<string,mixed>>> $anuncios_por_adset */
 /** @var string $desde */
 /** @var string $hasta */
-/** @var string|null $mes_seleccionado */
+/** @var \MisterCo\Reports\Domain\PeriodoReporte $periodo */
 /** @var list<string> $meses_disponibles */
 
 use MisterCo\Reports\Domain\ObjetivoCampania;
@@ -42,7 +42,7 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
 </div>
 
 <section class="shell__body">
-    <p><a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/dashboard') ?>">← Volver al dashboard</a></p>
+    <p><a href="<?= $view->e($view->url('/admin/clientes/' . ((int) $cliente['id']) . '/dashboard') . '?' . $periodo->query()) ?>">← Volver al dashboard</a></p>
 
     <h1><?= $view->e((string) $campania['nombre']) ?></h1>
     <p class="muted">
@@ -51,31 +51,15 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
         <?php if ($campania['estado']): ?> · Estado: <?= $view->e((string) $campania['estado']) ?><?php endif; ?>
     </p>
 
-    <?php
-    $mesesNombre = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-    $formatMes = static function (string $yyyymm) use ($mesesNombre): string {
-        $partes = explode('-', $yyyymm);
-        if (count($partes) !== 2) return $yyyymm;
-        $mes = (int) $partes[1];
-        return ucfirst($mesesNombre[$mes - 1] ?? '') . ' ' . $partes[0];
-    };
-    ?>
     <?php if ($meses_disponibles === []): ?>
         <p class="muted">Aún no hay datos importados para esta campaña.</p>
     <?php else: ?>
-        <form method="GET" class="dashboard-filters">
-            <label class="field">
-                <span class="field__label">Mes</span>
-                <select class="field__input" name="mes" onchange="this.form.submit()">
-                    <?php foreach ($meses_disponibles as $m): ?>
-                        <option value="<?= $view->e($m) ?>" <?= $m === $mes_seleccionado ? 'selected' : '' ?>>
-                            <?= $view->e($formatMes($m)) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <span class="muted" style="align-self:center"><?= $view->e($desde) ?> → <?= $view->e($hasta) ?></span>
-        </form>
+        <?= $view->renderPartial('partials/filtro_periodo', [
+            'action' => $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/campanias/' . ((int) $campania['id'])),
+            'periodo' => $periodo,
+            'meses_disponibles' => $meses_disponibles,
+            'exportar' => ['metodo' => 'post', 'url' => $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/campanias/' . ((int) $campania['id']) . '/reporte.pdf')],
+        ]) ?>
     <?php endif; ?>
 
     <?php if (!empty($analisis ?? '')): ?>

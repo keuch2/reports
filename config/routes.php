@@ -11,6 +11,7 @@ use MisterCo\Reports\Controllers\Admin\MetaConexionController;
 use MisterCo\Reports\Controllers\Admin\PermisosController;
 use MisterCo\Reports\Controllers\Admin\PlantillaPdfController;
 use MisterCo\Reports\Controllers\Admin\PreviewClienteController;
+use MisterCo\Reports\Controllers\Admin\ReporteClienteController;
 use MisterCo\Reports\Controllers\Admin\UsuarioAdminController;
 use MisterCo\Reports\Controllers\AuthController;
 use MisterCo\Reports\Controllers\PerfilController;
@@ -73,9 +74,12 @@ return function (Router $router): void {
     $router->post('/admin/clientes/{id}/usuario', [AdminClienteController::class, 'actualizarUsuario'], $adminCsrf);
     $router->post('/admin/clientes/{id}/password', [AdminClienteController::class, 'cambiarPassword'], $adminCsrf);
 
-    // Preview del dashboard del cliente desde sesión admin (solo lectura)
+    // Preview del dashboard del cliente desde sesión admin (mismos filtros y PDF que el cliente)
     $router->get('/admin/clientes/{id}/dashboard', [PreviewClienteController::class, 'dashboard'], $admin);
     $router->get('/admin/clientes/{id}/campanias/{cid}', [PreviewClienteController::class, 'detalleCampania'], $admin);
+    $router->get('/admin/clientes/{id}/reporte/previa', [ReporteClienteController::class, 'previa'], $admin);
+    $router->post('/admin/clientes/{id}/reporte.pdf', [ReporteClienteController::class, 'descargar'], $adminCsrf);
+    $router->post('/admin/clientes/{id}/campanias/{cid}/reporte.pdf', [ReporteClienteController::class, 'descargarCampania'], $adminCsrf);
 
     // Permisos avanzados por cliente (anuncios + métricas; campañas se asignan en /admin/clientes/{id})
     $router->get('/admin/clientes/{id}/permisos', [PermisosController::class, 'mostrar'], $admin);

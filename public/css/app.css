@@ -356,6 +356,7 @@ a { color: var(--color-primary); }
 /* Dashboard cliente */
 .dashboard-filters {
     display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
     align-items: flex-end;
     background: var(--color-surface);
@@ -365,7 +366,10 @@ a { color: var(--color-primary); }
     margin-bottom: 1.5rem;
 }
 .dashboard-filters .field { margin: 0; }
-.dashboard-filters .btn { margin-left: auto; }
+.dashboard-filters__form { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; margin: 0; }
+.dashboard-filters__exportar { margin: 0 0 0 auto; }
+.btn--secondary { background: var(--color-surface); color: var(--color-primary); border-color: var(--color-primary); }
+.btn--secondary:hover { background: var(--color-primary); color: white; }
 
 .campania-analisis {
     background: var(--color-surface);
