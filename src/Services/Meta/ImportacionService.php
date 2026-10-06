@@ -116,6 +116,12 @@ final class ImportacionService
         'effective_object_story_id', 'instagram_permalink_url',
     ];
 
+    /**
+     * Lado (px) pedido para thumbnail_url del creative. Sin estos parámetros Meta
+     * lo devuelve a 64x64, que se ve pixelado en la tarjeta del anuncio y el PDF.
+     */
+    private const THUMBNAIL_LADO = 1080;
+
     public function __construct(
         private readonly MetaTokenService $tokenService,
         private readonly CuentaPublicitariaRepository $cuentasRepo,
@@ -241,7 +247,11 @@ final class ImportacionService
             }
 
             // 3) Ads + creative — filtramos por las mismas campañas si hay filtro.
-            $creativeFieldsExpr = 'creative{' . implode(',', self::CREATIVE_FIELDS) . '}';
+            $creativeFieldsExpr = sprintf(
+                'creative.thumbnail_width(%1$d).thumbnail_height(%1$d){%2$s}',
+                self::THUMBNAIL_LADO,
+                implode(',', self::CREATIVE_FIELDS)
+            );
             $adsQuery = [
                 'fields' => [
                     'id', 'name', 'adset_id', 'campaign_id', 'status', 'preview_shareable_link',
@@ -275,6 +285,8 @@ final class ImportacionService
                     try {
                         $creativeFull = $cliente->get($datosCreative['creative_id'], [
                             'fields' => self::CREATIVE_FIELDS,
+                            'thumbnail_width' => self::THUMBNAIL_LADO,
+                            'thumbnail_height' => self::THUMBNAIL_LADO,
                         ]);
                         $llamadas++;
                         $datosCreative = $this->extraerCreative($creativeFull, (string) ($ad['preview_shareable_link'] ?? ''));
@@ -621,8 +633,15 @@ final class ImportacionService
                 $body = $body ?? ($data['message'] ?? null);
                 $title = $title ?? ($data['name'] ?? null);
                 $linkUrl = $linkUrl ?? ($data['link'] ?? null);
-                $image = $image ?? ($data['picture'] ?? null);
+                // video_data trae la portada del video en image_url (picture es de link_data).
+                $image = $image ?? ($data['picture'] ?? $data['image_url'] ?? null);
                 $imageHash = $imageHash ?? ($data['image_hash'] ?? null);
+                // Carrusel: la imagen está en cada tarjeta; usamos la primera.
+                $primeraTarjeta = $data['child_attachments'][0] ?? null;
+                if (is_array($primeraTarjeta)) {
+                    $image = $image ?? ($primeraTarjeta['picture'] ?? null);
+                    $imageHash = $imageHash ?? ($primeraTarjeta['image_hash'] ?? null);
+                }
                 if (isset($data['call_to_action']['type'])) {
                     $cta = $cta ?? $data['call_to_action']['type'];
                 }

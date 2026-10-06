@@ -6,6 +6,7 @@
 /** @var string $hasta */
 /** @var array<string,mixed> $totales */
 /** @var list<array<string,mixed>> $adsets */
+/** @var array<int, list<array<string,mixed>>> $anuncios_por_adset */
 /** @var list<array{tipo:string, cantidad:int, gasto:float, costo:?float}> $resultados_por_tipo */
 /** @var list<array<string,mixed>> $evolucion */
 /** @var string|null $comentarios */
@@ -93,6 +94,7 @@ if ($visitasRelevante && !ObjetivoCampania::visitasEsRedundante($objetivo) && ((
     .kpi-value { font-size: 15pt; font-weight: 700; margin-top: 2pt; }
     .kpi-sub { font-size: 8pt; color: #6b7280; margin-top: 2pt; }
     .costos .total td, .costos .total th { font-weight: 700; border-top: 1pt solid #1f3a8a; }
+<?php require __DIR__ . '/anuncio_card_estilos.php'; ?>
 </style>
 
 <div class="portada">
@@ -213,6 +215,22 @@ $resultadosPorTipoFiltrado = $tiposRelevantes === []
         <?php endforeach; ?>
         </tbody>
     </table>
+<?php endif; ?>
+
+<?php $totalAds = array_sum(array_map('count', $anuncios_por_adset)); ?>
+<?php if ($totalAds > 0): ?>
+<h2>Anuncios (<?= $totalAds ?>)</h2>
+<?= $view->renderPartial('pdf/anuncios_por_adset', [
+    'adsets' => $adsets,
+    'anuncios_por_adset' => $anuncios_por_adset,
+    'mon' => $mon,
+    'fmtMoneda' => $fmtMoneda,
+    'fmtNum' => $fmtNum,
+    'fmtPct' => $fmtPct,
+    'labelResultadosCorto' => $labelResultadosCorto,
+    'ocultarConversaciones' => $ocultarConversaciones,
+    'ocultarLeads' => $ocultarLeads,
+]) ?>
 <?php endif; ?>
 
 <?php

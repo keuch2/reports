@@ -6,11 +6,14 @@
 /** @var string $hasta */
 /** @var array<string,mixed> $totales */
 /** @var list<array<string,mixed>> $campanias */
+/** @var array<int, array{adsets: list<array<string,mixed>>, anuncios_por_adset: array<int, list<array<string,mixed>>>}> $anuncios_por_campania */
 /** @var list<array<string,mixed>> $evolucion */
 /** @var list<array{tipo:string, cantidad:int, gasto:float, costo:?float}> $resultados_por_tipo */
 /** @var list<string> $secciones */
 /** @var string|null $comentarios */
 /** @var string $generado_en */
+
+use MisterCo\Reports\Domain\ObjetivoCampania;
 
 $incluir = static fn (string $s): bool => in_array($s, $secciones, true);
 
@@ -60,6 +63,8 @@ $colVisit = $sumColumna('visitas') > 0;
     .kpi-sub { font-size: 8pt; color: #6b7280; margin-top: 2pt; }
     .costos td, .costos th { font-size: 10pt; }
     .costos .total td, .costos .total th { font-weight: 700; border-top: 1pt solid #1f3a8a; }
+    h3.campania-anuncios { font-size: 12pt; margin: 14pt 0 2pt; }
+<?php require __DIR__ . '/anuncio_card_estilos.php'; ?>
 </style>
 
 <div class="portada">
@@ -170,6 +175,30 @@ $colVisit = $sumColumna('visitas') > 0;
     </table>
 <?php endif; ?>
 <?php endif; // tabla_campanias ?>
+
+<?php if ($incluir('tabla_anuncios') && $anuncios_por_campania !== []): ?>
+<h2>Anuncios</h2>
+<?php foreach ($campanias as $c):
+    $datosAds = $anuncios_por_campania[(int) $c['campania_id']] ?? null;
+    if ($datosAds === null || array_sum(array_map('count', $datosAds['anuncios_por_adset'])) === 0) {
+        continue;
+    }
+    $objetivoCam = (string) ObjetivoCampania::objetivoEfectivo('', (string) ($c['objetivo'] ?? ''));
+?>
+    <h3 class="campania-anuncios"><?= $view->e((string) $c['campania']) ?></h3>
+    <?= $view->renderPartial('pdf/anuncios_por_adset', [
+        'adsets' => $datosAds['adsets'],
+        'anuncios_por_adset' => $datosAds['anuncios_por_adset'],
+        'mon' => $mon,
+        'fmtMoneda' => $fmtMoneda,
+        'fmtNum' => $fmtNum,
+        'fmtPct' => $fmtPct,
+        'labelResultadosCorto' => ObjetivoCampania::nombreCortoResultados($objetivoCam),
+        'ocultarConversaciones' => ObjetivoCampania::conversacionesEsRedundante($objetivoCam),
+        'ocultarLeads' => ObjetivoCampania::leadsEsRedundante($objetivoCam),
+    ]) ?>
+<?php endforeach; ?>
+<?php endif; // tabla_anuncios ?>
 
 <?php if ($incluir('evolucion_diaria')): ?>
 <h2>Evolución diaria</h2>

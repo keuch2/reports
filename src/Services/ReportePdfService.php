@@ -47,6 +47,17 @@ final class ReportePdfService
         $evolucion = $this->dashboard->evolucionDiaria($clienteId, $desde, $hasta);
         $resultadosPorTipo = $this->dashboard->resultadosPorTipoGlobal($clienteId, $desde, $hasta);
 
+        $anunciosPorCampania = [];
+        if (in_array('tabla_anuncios', $secciones, true)) {
+            foreach ($campanias as $c) {
+                $campaniaId = (int) $c['campania_id'];
+                $anunciosPorCampania[$campaniaId] = [
+                    'adsets' => $this->dashboard->adsetsDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta),
+                    'anuncios_por_adset' => $this->anunciosPorAdset($clienteId, $campaniaId, $desde, $hasta),
+                ];
+            }
+        }
+
         // La moneda del PDF es la de la primera campaña asignada (asumimos consistencia).
         $monedaInfo = $this->db->selectOne(
             'SELECT cp.moneda
@@ -66,6 +77,7 @@ final class ReportePdfService
             'hasta' => $hasta,
             'totales' => $totales,
             'campanias' => $campanias,
+            'anuncios_por_campania' => $anunciosPorCampania,
             'evolucion' => $evolucion,
             'resultados_por_tipo' => $resultadosPorTipo,
             'secciones' => $secciones,
@@ -142,6 +154,7 @@ final class ReportePdfService
         $adsets = $this->dashboard->adsetsDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta);
         $resultadosPorTipo = $this->dashboard->resultadosPorTipoCampania($clienteId, $campaniaId, $desde, $hasta);
         $evolucion = $this->dashboard->evolucionDiariaCampania($clienteId, $campaniaId, $desde, $hasta);
+        $anunciosPorAdset = $this->anunciosPorAdset($clienteId, $campaniaId, $desde, $hasta);
 
         $html = $this->view->render('pdf/reporte_campania', [
             'cliente' => $cliente,
@@ -150,6 +163,7 @@ final class ReportePdfService
             'hasta' => $hasta,
             'totales' => $totales,
             'adsets' => $adsets,
+            'anuncios_por_adset' => $anunciosPorAdset,
             'resultados_por_tipo' => $resultadosPorTipo,
             'evolucion' => $evolucion,
             'comentarios' => $comentarios,
@@ -228,6 +242,22 @@ final class ReportePdfService
         );
 
         return ['ruta' => $ruta, 'nombre' => $nombre, 'tamanio' => $tamanio];
+    }
+
+    /**
+     * Anuncios visibles de la campaña agrupados por adset_id, igual que
+     * CampaniaController::detalle.
+     *
+     * @return array<int, list<array<string,mixed>>>
+     */
+    private function anunciosPorAdset(int $clienteId, int $campaniaId, string $desde, string $hasta): array
+    {
+        $porAdset = [];
+        foreach ($this->dashboard->anunciosDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta) as $a) {
+            $porAdset[(int) $a['adset_id']][] = $a;
+        }
+
+        return $porAdset;
     }
 
     /** @return array<string,mixed> */
