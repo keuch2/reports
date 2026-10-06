@@ -47,15 +47,15 @@ final class ReportePdfService
         $evolucion = $this->dashboard->evolucionDiaria($clienteId, $desde, $hasta);
         $resultadosPorTipo = $this->dashboard->resultadosPorTipoGlobal($clienteId, $desde, $hasta);
 
+        // Las tarjetas de anuncios van siempre (como en el PDF de campaña), no
+        // dependen de la plantilla.
         $anunciosPorCampania = [];
-        if (in_array('tabla_anuncios', $secciones, true)) {
-            foreach ($campanias as $c) {
-                $campaniaId = (int) $c['campania_id'];
-                $anunciosPorCampania[$campaniaId] = [
-                    'adsets' => $this->dashboard->adsetsDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta),
-                    'anuncios_por_adset' => $this->anunciosPorAdset($clienteId, $campaniaId, $desde, $hasta),
-                ];
-            }
+        foreach ($campanias as $c) {
+            $campaniaId = (int) $c['campania_id'];
+            $anunciosPorCampania[$campaniaId] = [
+                'adsets' => $this->dashboard->adsetsDeCampaniaConMetricas($clienteId, $campaniaId, $desde, $hasta),
+                'anuncios_por_adset' => $this->anunciosPorAdset($clienteId, $campaniaId, $desde, $hasta),
+            ];
         }
 
         // La moneda del PDF es la de la primera campaña asignada (asumimos consistencia).

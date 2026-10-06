@@ -13,7 +13,6 @@ final class PlantillaPdfRepository
         'resumen_ejecutivo' => 'Resumen ejecutivo (KPIs)',
         'resultados_por_tipo' => 'Resultados por tipo (conversaciones, leads…)',
         'tabla_campanias' => 'Tabla de campañas',
-        'tabla_anuncios' => 'Tabla de anuncios',
         'evolucion_diaria' => 'Evolución diaria',
         'costos' => 'Costos del período (comisión + IVA)',
         'comentarios' => 'Comentarios estratégicos',

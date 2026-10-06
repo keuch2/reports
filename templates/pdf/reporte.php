@@ -176,8 +176,14 @@ $colVisit = $sumColumna('visitas') > 0;
 <?php endif; ?>
 <?php endif; // tabla_campanias ?>
 
-<?php if ($incluir('tabla_anuncios') && $anuncios_por_campania !== []): ?>
-<h2>Anuncios</h2>
+<?php
+$totalAds = array_sum(array_map(
+    static fn ($d) => array_sum(array_map('count', $d['anuncios_por_adset'])),
+    $anuncios_por_campania
+));
+?>
+<?php if ($totalAds > 0): ?>
+<h2>Anuncios (<?= $totalAds ?>)</h2>
 <?php foreach ($campanias as $c):
     $datosAds = $anuncios_por_campania[(int) $c['campania_id']] ?? null;
     if ($datosAds === null || array_sum(array_map('count', $datosAds['anuncios_por_adset'])) === 0) {
@@ -198,7 +204,7 @@ $colVisit = $sumColumna('visitas') > 0;
         'ocultarLeads' => ObjetivoCampania::leadsEsRedundante($objetivoCam),
     ]) ?>
 <?php endforeach; ?>
-<?php endif; // tabla_anuncios ?>
+<?php endif; // anuncios ?>
 
 <?php if ($incluir('evolucion_diaria')): ?>
 <h2>Evolución diaria</h2>
