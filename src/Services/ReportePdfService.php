@@ -13,6 +13,7 @@ final class ReportePdfService
     public function __construct(
         private readonly View $view,
         private readonly DashboardService $dashboard,
+        private readonly GoogleReporteService $google,
         private readonly Database $db,
         private readonly string $storagePath,
     ) {
@@ -174,6 +175,80 @@ final class ReportePdfService
             'reporte_campania_%d_%s_%s_a_%s.pdf',
             $campaniaId,
             preg_replace('/[^a-z0-9]+/i', '-', strtolower((string) $campania['nombre'])),
+            $desde,
+            $hasta
+        );
+
+        return $this->renderizarPdf(
+            $html, $nombre, (string) $cliente['nombre_comercial'], $desde, $hasta,
+            $clienteId, $generadoPorUsuarioId, $comentarios, $marcaDeAgua
+        );
+    }
+
+    /**
+     * PDF de Google Ads del cliente: mismos datos que su dashboard de Google Ads.
+     *
+     * @return array{ruta:string, nombre:string, tamanio:int}
+     */
+    public function generarGoogleAds(
+        int $clienteId,
+        string $desde,
+        string $hasta,
+        int $generadoPorUsuarioId,
+        ?string $comentarios = null,
+        bool $marcaDeAgua = false,
+    ): array {
+        return $this->generarGoogle('pdf/google_ads', 'google_ads', $this->google->datosAds($clienteId, $desde, $hasta),
+            $clienteId, $desde, $hasta, $generadoPorUsuarioId, $comentarios, $marcaDeAgua);
+    }
+
+    /**
+     * PDF de Google Analytics del cliente: mismos datos que su dashboard de Analytics.
+     *
+     * @return array{ruta:string, nombre:string, tamanio:int}
+     */
+    public function generarAnalytics(
+        int $clienteId,
+        string $desde,
+        string $hasta,
+        int $generadoPorUsuarioId,
+        ?string $comentarios = null,
+        bool $marcaDeAgua = false,
+    ): array {
+        return $this->generarGoogle('pdf/google_analytics', 'google_analytics', $this->google->datosAnalytics($clienteId, $desde, $hasta),
+            $clienteId, $desde, $hasta, $generadoPorUsuarioId, $comentarios, $marcaDeAgua);
+    }
+
+    /**
+     * @param array<string, mixed> $datos
+     * @return array{ruta:string, nombre:string, tamanio:int}
+     */
+    private function generarGoogle(
+        string $plantilla,
+        string $prefijoArchivo,
+        array $datos,
+        int $clienteId,
+        string $desde,
+        string $hasta,
+        int $generadoPorUsuarioId,
+        ?string $comentarios,
+        bool $marcaDeAgua,
+    ): array {
+        $cliente = $this->buscarCliente($clienteId);
+
+        $html = $this->view->render($plantilla, $datos + [
+            'cliente' => $cliente,
+            'desde' => $desde,
+            'hasta' => $hasta,
+            'comentarios' => $comentarios,
+            'generado_en' => date('Y-m-d H:i'),
+        ], layout: null);
+
+        $nombre = sprintf(
+            'reporte_%s_%d_%s_%s_a_%s.pdf',
+            $prefijoArchivo,
+            $clienteId,
+            preg_replace('/[^a-z0-9]+/i', '-', strtolower((string) $cliente['nombre_comercial'])),
             $desde,
             $hasta
         );

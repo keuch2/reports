@@ -8,6 +8,7 @@
     <nav class="shell__nav">
         <a href="<?= $view->url('/admin') ?>" class="<?= $seccion === 'home' ? 'active' : '' ?>">Inicio</a>
         <a href="<?= $view->url('/admin/meta') ?>" class="<?= $seccion === 'meta' ? 'active' : '' ?>">Cuenta Meta</a>
+        <a href="<?= $view->url('/admin/google') ?>" class="<?= $seccion === 'google' ? 'active' : '' ?>">Cuenta Google</a>
         <a href="<?= $view->url('/admin/importar') ?>" class="<?= $seccion === 'importar' ? 'active' : '' ?>">Importar</a>
         <a href="<?= $view->url('/admin/clientes') ?>" class="<?= $seccion === 'clientes' ? 'active' : '' ?>">Clientes</a>
         <a href="<?= $view->url('/admin/plantillas') ?>" class="<?= $seccion === 'plantillas' ? 'active' : '' ?>">Plantillas</a>

@@ -12,6 +12,7 @@ use MisterCo\Reports\Domain\PeriodoReporte;
 use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Services\DashboardPreferenciasService;
 use MisterCo\Reports\Services\DashboardService;
+use MisterCo\Reports\Services\GoogleReporteService;
 use MisterCo\Reports\Services\PermisosService;
 
 /**
@@ -39,6 +40,15 @@ final class DashboardController
 
         $campaniasAsignadas = $service->campaniasDelCliente($clienteId);
         if ($campaniasAsignadas === []) {
+            // Clientes solo con Google: su inicio es la primera fuente que tengan.
+            $google = $this->container->get(GoogleReporteService::class);
+            if ($google->tieneGoogleAds($clienteId)) {
+                return Response::redirect('/cliente/google-ads');
+            }
+            if ($google->tieneAnalytics($clienteId)) {
+                return Response::redirect('/cliente/analytics');
+            }
+
             return Response::html($view->render('cliente/sin_datos', [
                 'usuario' => $usuario,
                 'titulo' => 'Mi dashboard',

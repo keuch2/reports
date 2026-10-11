@@ -11,6 +11,9 @@ use RuntimeException;
  */
 final class View
 {
+    /** @var array<string, mixed> Datos disponibles en todas las plantillas (los explícitos ganan). */
+    private array $compartidos = [];
+
     public function __construct(
         private readonly string $templatesPath,
         private readonly Session $session,
@@ -29,6 +32,11 @@ final class View
         }
 
         return $this->pathPrefix . $path;
+    }
+
+    public function compartir(string $clave, mixed $valor): void
+    {
+        $this->compartidos[$clave] = $valor;
     }
 
     /**
@@ -59,7 +67,7 @@ final class View
         $view = $this;
         $session = $this->session;
 
-        extract($data, EXTR_SKIP);
+        extract($data + $this->compartidos, EXTR_SKIP);
 
         ob_start();
         require $file;

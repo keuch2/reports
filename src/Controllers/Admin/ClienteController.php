@@ -13,6 +13,8 @@ use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\ClienteRepository;
 use MisterCo\Reports\Repositories\CuentaPublicitariaRepository;
 use MisterCo\Reports\Repositories\EntidadesMetaRepository;
+use MisterCo\Reports\Repositories\GoogleAdsRepository;
+use MisterCo\Reports\Repositories\GoogleAnalyticsRepository;
 use MisterCo\Reports\Repositories\UsuarioRepository;
 use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\PasswordPolicyService;
@@ -117,6 +119,13 @@ final class ClienteController
             ];
         }
 
+        $googleAds = $this->container->get(GoogleAdsRepository::class);
+        $googleAdsCuentas = [];
+        foreach ($googleAds->listarCuentas() as $cuenta) {
+            $googleAdsCuentas[] = ['cuenta' => $cuenta, 'campanias' => $googleAds->campaniasDeCuenta((int) $cuenta['id'])];
+        }
+        $analytics = $this->container->get(GoogleAnalyticsRepository::class);
+
         return Response::html($view->render('admin/clientes_detalle', [
             'usuario' => $request->attributes['usuario'],
             'titulo' => 'Cliente · ' . $cliente['nombre_comercial'],
@@ -125,6 +134,10 @@ final class ClienteController
             'campanias_asignadas' => $repo->campaniasAsignadas($id),
             'ids_asignadas' => $repo->idsCampaniasAsignadas($id),
             'cuentas_con_campanias' => $cuentasConCampanias,
+            'google_ads_cuentas' => $googleAdsCuentas,
+            'google_ads_ids_asignadas' => $googleAds->idsAsignadas($id),
+            'ga4_propiedades' => $analytics->listarPropiedades(),
+            'ga4_ids_asignadas' => $analytics->idsAsignadas($id),
             'success' => $session->getFlash('success'),
             'error' => $session->getFlash('error'),
         ]));
@@ -162,6 +175,53 @@ final class ClienteController
         $session->flash('success', count($ids) . ' campaña(s) asignada(s) al cliente.');
 
         return Response::redirect('/admin/clientes/' . $clienteId);
+    }
+
+    /** Reemplaza el set de campañas de Google Ads asignadas al cliente. */
+    public function asignarGoogleAds(Request $request): Response
+    {
+        $ids = $this->idsDelPost($request, 'google_ads_campanias');
+        $clienteId = (int) ($request->attributes['id'] ?? 0);
+        if ($this->container->get(ClienteRepository::class)->buscarPorId($clienteId) === null) {
+            return Response::redirect('/admin/clientes');
+        }
+
+        $this->container->get(GoogleAdsRepository::class)->reemplazarAsignadas($clienteId, $ids);
+        $this->container->get(AuditService::class)->registrar(
+            'cliente.google_ads_asignadas', $request->attributes['usuario'], $request->ip, $request->userAgent,
+            'cliente', (string) $clienteId, ['cantidad' => count($ids), 'campania_ids' => $ids]
+        );
+        $this->container->get(Session::class)->flash('success', count($ids) . ' campaña(s) de Google Ads asignada(s) al cliente.');
+
+        return Response::redirect('/admin/clientes/' . $clienteId);
+    }
+
+    /** Reemplaza el set de propiedades de Google Analytics asignadas al cliente. */
+    public function asignarAnalytics(Request $request): Response
+    {
+        $ids = $this->idsDelPost($request, 'ga4_propiedades');
+        $clienteId = (int) ($request->attributes['id'] ?? 0);
+        if ($this->container->get(ClienteRepository::class)->buscarPorId($clienteId) === null) {
+            return Response::redirect('/admin/clientes');
+        }
+
+        $this->container->get(GoogleAnalyticsRepository::class)->reemplazarAsignadas($clienteId, $ids);
+        $this->container->get(AuditService::class)->registrar(
+            'cliente.analytics_asignadas', $request->attributes['usuario'], $request->ip, $request->userAgent,
+            'cliente', (string) $clienteId, ['cantidad' => count($ids), 'propiedad_ids' => $ids]
+        );
+        $this->container->get(Session::class)->flash('success', count($ids) . ' propiedad(es) de Google Analytics asignada(s) al cliente.');
+
+        return Response::redirect('/admin/clientes/' . $clienteId);
+    }
+
+    /** @return list<int> */
+    private function idsDelPost(Request $request, string $campo): array
+    {
+        return array_values(array_filter(
+            array_unique(array_map('intval', (array) ($request->post[$campo] ?? []))),
+            static fn (int $id) => $id > 0
+        ));
     }
 
     /**

@@ -8,6 +8,8 @@ use Closure;
 use MisterCo\Reports\Core\Container;
 use MisterCo\Reports\Core\Request;
 use MisterCo\Reports\Core\Response;
+use MisterCo\Reports\Core\View;
+use MisterCo\Reports\Repositories\ClienteRepository;
 use MisterCo\Reports\Services\AuthService;
 
 final class ClienteMiddleware
@@ -30,6 +32,11 @@ final class ClienteMiddleware
         }
 
         $request->attributes['usuario'] = $usuario;
+        // El header del cliente muestra solo las fuentes que tiene asignadas.
+        $this->container->get(View::class)->compartir(
+            'fuentes_cliente',
+            $this->container->get(ClienteRepository::class)->fuentesAsignadas((int) $usuario->clienteId)
+        );
 
         return $next($request);
     }

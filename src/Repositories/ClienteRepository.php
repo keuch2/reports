@@ -171,4 +171,25 @@ final class ClienteRepository
             throw $e;
         }
     }
+
+    /**
+     * Qué fuentes de datos tiene asignadas el cliente (para su navegación).
+     *
+     * @return array{meta: bool, google_ads: bool, analytics: bool}
+     */
+    public function fuentesAsignadas(int $clienteId): array
+    {
+        $row = $this->db->selectOne(
+            'SELECT EXISTS(SELECT 1 FROM permisos_cliente_campania WHERE cliente_id = :c1) AS meta,
+                    EXISTS(SELECT 1 FROM permisos_cliente_google_ads_campania WHERE cliente_id = :c2) AS google_ads,
+                    EXISTS(SELECT 1 FROM permisos_cliente_ga4_propiedad WHERE cliente_id = :c3) AS analytics',
+            ['c1' => $clienteId, 'c2' => $clienteId, 'c3' => $clienteId]
+        );
+
+        return [
+            'meta' => (bool) ($row['meta'] ?? false),
+            'google_ads' => (bool) ($row['google_ads'] ?? false),
+            'analytics' => (bool) ($row['analytics'] ?? false),
+        ];
+    }
 }

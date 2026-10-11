@@ -18,6 +18,10 @@
             <p>Disparar una importación on-demand desde Meta para una cuenta y rango de fechas.</p>
         </article>
         <article class="card">
+            <h2><a href="<?= $view->url('/admin/google') ?>">Google Ads y Analytics</a></h2>
+            <p>Conectar la cuenta de Google, sincronizar cuentas de Google Ads y propiedades GA4, e importar sus métricas.</p>
+        </article>
+        <article class="card">
             <h2><a href="<?= $view->url('/admin/clientes') ?>">Clientes</a></h2>
             <p>Gestión de clientes, usuarios primarios y asignación de cuentas publicitarias.</p>
         </article>

@@ -9,7 +9,7 @@
 
 $widgetsAOrdenar = array_unique(array_merge($preferencias['widgets'], array_keys($widgets_disponibles)));
 ?>
-<?= $view->renderPartial('partials/cliente_header', ['usuario' => $usuario]) ?>
+<?= $view->renderPartial('partials/cliente_header', ['usuario' => $usuario, 'seccion' => 'preferencias']) ?>
 
 <section class="shell__body">
     <p><a href="<?= $view->url('/cliente') ?>">← Volver al dashboard</a></p>

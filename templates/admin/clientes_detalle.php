@@ -6,10 +6,16 @@
 /** @var list<array<string,mixed>> $campanias_asignadas */
 /** @var list<int> $ids_asignadas */
 /** @var list<array{cuenta:array<string,mixed>, campanias:list<array<string,mixed>>}> $cuentas_con_campanias */
+/** @var list<array{cuenta:array<string,mixed>, campanias:list<array<string,mixed>>}> $google_ads_cuentas */
+/** @var list<int> $google_ads_ids_asignadas */
+/** @var list<array<string,mixed>> $ga4_propiedades */
+/** @var list<int> $ga4_ids_asignadas */
 /** @var string|null $success */
 /** @var string|null $error */
 
 $asignadasSet = array_flip($ids_asignadas);
+$googleAdsSet = array_flip($google_ads_ids_asignadas);
+$ga4Set = array_flip($ga4_ids_asignadas);
 ?>
 <?= $view->renderPartial('partials/admin_header', ['usuario' => $usuario, 'seccion' => 'clientes']) ?>
 
@@ -28,6 +34,12 @@ $asignadasSet = array_flip($ids_asignadas);
             <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/dashboard') ?>" class="btn btn--primary">
                 👁️ Ver dashboard del cliente
             </a>
+            <?php if ($google_ads_ids_asignadas !== []): ?>
+                <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/google-ads') ?>" class="btn btn--secondary">Google Ads</a>
+            <?php endif; ?>
+            <?php if ($ga4_ids_asignadas !== []): ?>
+                <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/analytics') ?>" class="btn btn--secondary">Analytics</a>
+            <?php endif; ?>
             <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/permisos') ?>" class="btn btn--link">
                 Permisos avanzados →
             </a>
@@ -181,6 +193,79 @@ $asignadasSet = array_flip($ids_asignadas);
 
                 <div class="form-actions" style="margin-top:1.5rem">
                     <button type="submit" class="btn btn--primary">Guardar asignaciones</button>
+                </div>
+            </form>
+        <?php endif; ?>
+    </article>
+
+    <article class="card" style="margin-top:1.5rem">
+        <h2>Campañas de Google Ads (<?= count($google_ads_ids_asignadas) ?> asignadas)</h2>
+        <p class="muted">Marcá las campañas de Google Ads que el cliente podrá ver en su reporte de Google Ads.</p>
+
+        <?php if ($google_ads_cuentas === []): ?>
+            <p class="muted">No hay cuentas de Google Ads sincronizadas. <a href="<?= $view->url('/admin/google') ?>">Conectá Google</a> e importá una cuenta primero.</p>
+        <?php else: ?>
+            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/asignar-google-ads') ?>">
+                <?= $view->csrfField() ?>
+                <?php foreach ($google_ads_cuentas as $bloque): ?>
+                    <?php $cuenta = $bloque['cuenta']; if ($bloque['campanias'] === []) continue; ?>
+                    <fieldset class="fieldset" style="margin-top:1rem">
+                        <legend>
+                            <?= $view->e((string) $cuenta['nombre']) ?>
+                            <span class="muted" style="font-weight:normal;font-size:0.85rem">
+                                · <?= $view->e((string) $cuenta['customer_id']) ?> · <?= $view->e((string) ($cuenta['moneda'] ?? '')) ?>
+                            </span>
+                        </legend>
+                        <div class="campania-select-actions">
+                            <button type="button" class="btn btn--link" data-toggle-all="gads-<?= (int) $cuenta['id'] ?>">Marcar todas</button>
+                        </div>
+                        <table class="table" data-cuenta="gads-<?= (int) $cuenta['id'] ?>">
+                            <thead><tr><th style="width:50px"></th><th>Campaña</th><th>Tipo</th><th>Estado</th></tr></thead>
+                            <tbody>
+                            <?php foreach ($bloque['campanias'] as $c): ?>
+                                <tr>
+                                    <td><input type="checkbox" name="google_ads_campanias[]" value="<?= (int) $c['id'] ?>" <?= isset($googleAdsSet[(int) $c['id']]) ? 'checked' : '' ?>></td>
+                                    <td><?= $view->e((string) $c['nombre']) ?></td>
+                                    <td><?= $view->e(\MisterCo\Reports\Domain\EtiquetasGoogle::tipoCampania($c['tipo_canal'])) ?></td>
+                                    <td><?= $view->e(\MisterCo\Reports\Domain\EtiquetasGoogle::estadoCampania($c['estado'])) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </fieldset>
+                <?php endforeach; ?>
+                <div class="form-actions" style="margin-top:1.5rem">
+                    <button type="submit" class="btn btn--primary">Guardar campañas de Google Ads</button>
+                </div>
+            </form>
+        <?php endif; ?>
+    </article>
+
+    <article class="card" style="margin-top:1.5rem">
+        <h2>Google Analytics (<?= count($ga4_ids_asignadas) ?> asignadas)</h2>
+        <p class="muted">Marcá las propiedades (sitios web) de Google Analytics que el cliente podrá ver.</p>
+
+        <?php if ($ga4_propiedades === []): ?>
+            <p class="muted">No hay propiedades de Google Analytics sincronizadas. <a href="<?= $view->url('/admin/google') ?>">Conectá Google</a> primero.</p>
+        <?php else: ?>
+            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/asignar-analytics') ?>">
+                <?= $view->csrfField() ?>
+                <table class="table">
+                    <thead><tr><th style="width:50px"></th><th>Propiedad</th><th>Cuenta de Analytics</th><th>Property ID</th><th>Última importación</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($ga4_propiedades as $p): ?>
+                        <tr>
+                            <td><input type="checkbox" name="ga4_propiedades[]" value="<?= (int) $p['id'] ?>" <?= isset($ga4Set[(int) $p['id']]) ? 'checked' : '' ?>></td>
+                            <td><?= $view->e((string) $p['nombre']) ?></td>
+                            <td><?= $view->e((string) ($p['cuenta_nombre'] ?? '—')) ?></td>
+                            <td><code><?= $view->e((string) $p['property_id']) ?></code></td>
+                            <td><?= $view->e((string) ($p['ultima_sincronizacion_en'] ?? 'nunca')) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <div class="form-actions" style="margin-top:1.5rem">
+                    <button type="submit" class="btn btn--primary">Guardar propiedades de Analytics</button>
                 </div>
             </form>
         <?php endif; ?>

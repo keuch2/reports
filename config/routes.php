@@ -5,6 +5,7 @@ declare(strict_types=1);
 use MisterCo\Reports\Controllers\Admin\AuditoriaController;
 use MisterCo\Reports\Controllers\Admin\ClienteController as AdminClienteController;
 use MisterCo\Reports\Controllers\Admin\DosFactorController;
+use MisterCo\Reports\Controllers\Admin\GoogleConexionController;
 use MisterCo\Reports\Controllers\Admin\ImportacionController;
 use MisterCo\Reports\Controllers\Admin\ImportacionHistoricoController;
 use MisterCo\Reports\Controllers\Admin\MetaConexionController;
@@ -19,6 +20,7 @@ use MisterCo\Reports\Controllers\Cliente\CampaniaController as ClienteCampaniaCo
 use MisterCo\Reports\Controllers\Cliente\DashboardController as ClienteDashboardController;
 use MisterCo\Reports\Controllers\Cliente\PreferenciasController as ClientePreferenciasController;
 use MisterCo\Reports\Controllers\Cliente\ReporteController as ClienteReporteController;
+use MisterCo\Reports\Controllers\GoogleReporteController;
 use MisterCo\Reports\Controllers\HomeController;
 use MisterCo\Reports\Controllers\PasswordResetController;
 use MisterCo\Reports\Core\Router;
@@ -61,6 +63,14 @@ return function (Router $router): void {
     $router->post('/admin/meta/conectar', [MetaConexionController::class, 'conectar'], $adminCsrf);
     $router->post('/admin/meta/desconectar', [MetaConexionController::class, 'desconectar'], $adminCsrf);
 
+    // Google Ads + Google Analytics: conexión OAuth, sincronización e importación.
+    $router->get('/admin/google', [GoogleConexionController::class, 'mostrar'], $admin);
+    $router->get('/admin/google/oauth/iniciar', [GoogleConexionController::class, 'oauthIniciar'], $admin);
+    $router->get('/admin/google/oauth/callback', [GoogleConexionController::class, 'oauthCallback'], $admin);
+    $router->post('/admin/google/sincronizar', [GoogleConexionController::class, 'sincronizar'], $adminCsrf);
+    $router->post('/admin/google/desconectar', [GoogleConexionController::class, 'desconectar'], $adminCsrf);
+    $router->post('/admin/google/importar', [GoogleConexionController::class, 'importar'], $adminCsrf);
+
     $router->get('/admin/importar', [ImportacionController::class, 'mostrar'], $admin);
     $router->get('/admin/importar/campanias', [ImportacionController::class, 'campaniasEnVivo'], $admin);
     $router->post('/admin/importar', [ImportacionController::class, 'ejecutar'], $adminCsrf);
@@ -73,6 +83,8 @@ return function (Router $router): void {
     $router->post('/admin/clientes/{id}/editar', [AdminClienteController::class, 'actualizarDatos'], $adminCsrf);
     $router->post('/admin/clientes/{id}/usuario', [AdminClienteController::class, 'actualizarUsuario'], $adminCsrf);
     $router->post('/admin/clientes/{id}/password', [AdminClienteController::class, 'cambiarPassword'], $adminCsrf);
+    $router->post('/admin/clientes/{id}/asignar-google-ads', [AdminClienteController::class, 'asignarGoogleAds'], $adminCsrf);
+    $router->post('/admin/clientes/{id}/asignar-analytics', [AdminClienteController::class, 'asignarAnalytics'], $adminCsrf);
 
     // Preview del dashboard del cliente desde sesión admin (mismos filtros y PDF que el cliente)
     $router->get('/admin/clientes/{id}/dashboard', [PreviewClienteController::class, 'dashboard'], $admin);
@@ -80,6 +92,14 @@ return function (Router $router): void {
     $router->get('/admin/clientes/{id}/reporte/previa', [ReporteClienteController::class, 'previa'], $admin);
     $router->post('/admin/clientes/{id}/reporte.pdf', [ReporteClienteController::class, 'descargar'], $adminCsrf);
     $router->post('/admin/clientes/{id}/campanias/{cid}/reporte.pdf', [ReporteClienteController::class, 'descargarCampania'], $adminCsrf);
+
+    // Preview de Google Ads / Analytics del cliente (mismo controlador que el cliente)
+    $router->get('/admin/clientes/{id}/google-ads', [GoogleReporteController::class, 'adsDashboard'], $admin);
+    $router->get('/admin/clientes/{id}/google-ads/reporte', [GoogleReporteController::class, 'adsPrevia'], $admin);
+    $router->post('/admin/clientes/{id}/google-ads/reporte.pdf', [GoogleReporteController::class, 'adsPdf'], $adminCsrf);
+    $router->get('/admin/clientes/{id}/analytics', [GoogleReporteController::class, 'analyticsDashboard'], $admin);
+    $router->get('/admin/clientes/{id}/analytics/reporte', [GoogleReporteController::class, 'analyticsPrevia'], $admin);
+    $router->post('/admin/clientes/{id}/analytics/reporte.pdf', [GoogleReporteController::class, 'analyticsPdf'], $adminCsrf);
 
     // Permisos avanzados por cliente (anuncios + métricas; campañas se asignan en /admin/clientes/{id})
     $router->get('/admin/clientes/{id}/permisos', [PermisosController::class, 'mostrar'], $admin);
@@ -123,4 +143,11 @@ return function (Router $router): void {
     $router->get('/cliente/reporte/previa', [ClienteReporteController::class, 'previa'], $cliente);
     $router->post('/cliente/reporte.pdf', [ClienteReporteController::class, 'descargar'], $clienteCsrf);
     $router->post('/cliente/campanias/{id}/reporte.pdf', [ClienteReporteController::class, 'descargarCampania'], $clienteCsrf);
+
+    $router->get('/cliente/google-ads', [GoogleReporteController::class, 'adsDashboard'], $cliente);
+    $router->get('/cliente/google-ads/reporte', [GoogleReporteController::class, 'adsPrevia'], $cliente);
+    $router->post('/cliente/google-ads/reporte.pdf', [GoogleReporteController::class, 'adsPdf'], $clienteCsrf);
+    $router->get('/cliente/analytics', [GoogleReporteController::class, 'analyticsDashboard'], $cliente);
+    $router->get('/cliente/analytics/reporte', [GoogleReporteController::class, 'analyticsPrevia'], $cliente);
+    $router->post('/cliente/analytics/reporte.pdf', [GoogleReporteController::class, 'analyticsPdf'], $clienteCsrf);
 };

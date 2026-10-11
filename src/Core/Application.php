@@ -9,6 +9,9 @@ use MisterCo\Reports\Repositories\ClienteRepository;
 use MisterCo\Reports\Repositories\ConfiguracionRepository;
 use MisterCo\Reports\Repositories\CuentaPublicitariaRepository;
 use MisterCo\Reports\Repositories\EntidadesMetaRepository;
+use MisterCo\Reports\Repositories\GoogleAdsRepository;
+use MisterCo\Reports\Repositories\GoogleAnalyticsRepository;
+use MisterCo\Reports\Repositories\ImportacionGoogleRepository;
 use MisterCo\Reports\Repositories\ImportacionRepository;
 use MisterCo\Reports\Repositories\MetricaCatalogoRepository;
 use MisterCo\Reports\Repositories\MetricaSnapshotRepository;
@@ -19,6 +22,10 @@ use MisterCo\Reports\Services\AuthService;
 use MisterCo\Reports\Services\DashboardPreferenciasService;
 use MisterCo\Reports\Services\AnalisisCampaniaService;
 use MisterCo\Reports\Services\DashboardService;
+use MisterCo\Reports\Services\Google\GoogleImportacionService;
+use MisterCo\Reports\Services\Google\GoogleOAuthService;
+use MisterCo\Reports\Services\Google\GoogleTokenService;
+use MisterCo\Reports\Services\GoogleReporteService;
 use MisterCo\Reports\Services\Meta\ImportacionService;
 use MisterCo\Reports\Services\Meta\MetaOAuthService;
 use MisterCo\Reports\Services\Meta\MetaTokenService;
@@ -90,6 +97,18 @@ final class Application
             (string) $appConfig['url'],
         ));
 
+        $container->bind(GoogleOAuthService::class, fn () => new GoogleOAuthService(
+            (string) ($_ENV['GOOGLE_CLIENT_ID'] ?? ''),
+            (string) ($_ENV['GOOGLE_CLIENT_SECRET'] ?? ''),
+            (string) $appConfig['url'],
+        ));
+        $container->bind(GoogleTokenService::class, fn (Container $c) => new GoogleTokenService(
+            $c->get(ConfiguracionRepository::class),
+            $c->get(GoogleOAuthService::class),
+            (string) ($_ENV['GOOGLE_ADS_DEVELOPER_TOKEN'] ?? ''),
+            (string) ($_ENV['GOOGLE_ADS_API_VERSION'] ?? 'v25'),
+        ));
+
         // Repositorios
         $container->bind(CuentaPublicitariaRepository::class, fn (Container $c) => new CuentaPublicitariaRepository($c->get(Database::class)));
         $container->bind(ClienteRepository::class, fn (Container $c) => new ClienteRepository($c->get(Database::class)));
@@ -99,6 +118,9 @@ final class Application
         $container->bind(MetricaCatalogoRepository::class, fn (Container $c) => new MetricaCatalogoRepository($c->get(Database::class)));
         $container->bind(PlantillaPdfRepository::class, fn (Container $c) => new PlantillaPdfRepository($c->get(Database::class)));
         $container->bind(UsuarioRepository::class, fn (Container $c) => new UsuarioRepository($c->get(Database::class)));
+        $container->bind(GoogleAdsRepository::class, fn (Container $c) => new GoogleAdsRepository($c->get(Database::class)));
+        $container->bind(GoogleAnalyticsRepository::class, fn (Container $c) => new GoogleAnalyticsRepository($c->get(Database::class)));
+        $container->bind(ImportacionGoogleRepository::class, fn (Container $c) => new ImportacionGoogleRepository($c->get(Database::class)));
 
         // Servicios de dominio
         $container->bind(PermisosService::class, fn (Container $c) => new PermisosService($c->get(Database::class)));
@@ -109,6 +131,16 @@ final class Application
             $c->get(MetricaSnapshotRepository::class),
             $c->get(ImportacionRepository::class),
         ));
+        $container->bind(GoogleImportacionService::class, fn (Container $c) => new GoogleImportacionService(
+            $c->get(GoogleTokenService::class),
+            $c->get(GoogleAdsRepository::class),
+            $c->get(GoogleAnalyticsRepository::class),
+            $c->get(ImportacionGoogleRepository::class),
+        ));
+        $container->bind(GoogleReporteService::class, fn (Container $c) => new GoogleReporteService(
+            $c->get(GoogleAdsRepository::class),
+            $c->get(GoogleAnalyticsRepository::class),
+        ));
         $container->bind(DashboardService::class, fn (Container $c) => new DashboardService(
             $c->get(Database::class),
             $c->get(PermisosService::class),
@@ -118,6 +150,7 @@ final class Application
         $container->bind(ReportePdfService::class, fn (Container $c) => new ReportePdfService(
             $c->get(View::class),
             $c->get(DashboardService::class),
+            $c->get(GoogleReporteService::class),
             $c->get(Database::class),
             $basePath . '/storage/reportes',
         ));
