@@ -228,6 +228,37 @@ final class GoogleAdsRepository
         );
     }
 
+    /** @return array<string, mixed> Totales de una campaña asignada al cliente. */
+    public function totalesCampania(int $clienteId, int $campaniaId, string $desde, string $hasta): array
+    {
+        $row = $this->db->selectOne(
+            'SELECT COALESCE(SUM(m.gasto), 0) AS gasto,
+                    COALESCE(SUM(m.impresiones), 0) AS impresiones,
+                    COALESCE(SUM(m.clicks), 0) AS clicks,
+                    COALESCE(SUM(m.conversiones), 0) AS conversiones,
+                    COALESCE(SUM(m.valor_conversiones), 0) AS valor_conversiones
+               FROM google_ads_metricas_diarias m
+               JOIN permisos_cliente_google_ads_campania p ON p.campania_id = m.campania_id
+              WHERE p.cliente_id = :c AND m.campania_id = :ca AND m.fecha BETWEEN :d AND :h',
+            ['c' => $clienteId, 'ca' => $campaniaId, 'd' => $desde, 'h' => $hasta]
+        ) ?? [];
+
+        return self::conDerivadas($row);
+    }
+
+    /** @return list<array<string, mixed>> Serie diaria de una campaña asignada al cliente. */
+    public function evolucionCampania(int $clienteId, int $campaniaId, string $desde, string $hasta): array
+    {
+        return $this->db->select(
+            'SELECT m.fecha, m.gasto, m.conversiones
+               FROM google_ads_metricas_diarias m
+               JOIN permisos_cliente_google_ads_campania p ON p.campania_id = m.campania_id
+              WHERE p.cliente_id = :c AND m.campania_id = :ca AND m.fecha BETWEEN :d AND :h
+           ORDER BY m.fecha',
+            ['c' => $clienteId, 'ca' => $campaniaId, 'd' => $desde, 'h' => $hasta]
+        );
+    }
+
     /**
      * CTR, CPC, CPM y costo por conversión calculados sobre los totales (no se
      * promedian promedios diarios).

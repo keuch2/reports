@@ -24,7 +24,7 @@ $detalle = count($propiedades_asignadas) === 1
     ? 'Sitio: ' . $propiedades_asignadas[0]['nombre']
     : count($propiedades_asignadas) . ' propiedades';
 ?>
-<?= $view->renderPartial('pdf/google_estilos', [
+<?= $view->renderPartial('pdf/portada', [
     'cliente' => $cliente,
     'subtitulo' => 'Reporte Google Analytics',
     'detalle' => $detalle,

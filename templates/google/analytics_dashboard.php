@@ -24,7 +24,7 @@ $hayIngresos = (float) ($totales['ingresos'] ?? 0) > 0;
 $totalSesionesCanal = array_sum(array_map(static fn ($c) => (int) $c['sesiones'], $canales));
 $nPropiedades = count($propiedades_asignadas);
 ?>
-<?= $view->renderPartial('partials/google_encabezado', [
+<?= $view->renderPartial('partials/encabezado_cliente', [
     'usuario' => $usuario, 'cliente' => $cliente, 'es_admin' => $es_admin,
     'seccion' => 'analytics', 'descripcion' => 'Vista previa de Google Analytics',
 ]) ?>

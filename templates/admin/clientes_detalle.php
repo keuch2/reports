@@ -34,6 +34,9 @@ $ga4Set = array_flip($ga4_ids_asignadas);
             <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/dashboard') ?>" class="btn btn--primary">
                 👁️ Ver dashboard del cliente
             </a>
+            <?php if ($campanias_asignadas !== [] || $google_ads_ids_asignadas !== []): ?>
+                <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/comparar') ?>" class="btn btn--secondary">Comparar</a>
+            <?php endif; ?>
             <?php if ($google_ads_ids_asignadas !== []): ?>
                 <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/google-ads') ?>" class="btn btn--secondary">Google Ads</a>
             <?php endif; ?>

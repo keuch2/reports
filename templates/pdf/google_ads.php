@@ -23,7 +23,7 @@ $fmtDec = static fn ($v) => number_format((float) $v, fmod((float) $v, 1.0) == 0
 $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, ',', '.') . '%';
 $conMoneda = static fn ($v) => $v === null ? '—' : $mon . ' ' . $fmtMoneda($v);
 ?>
-<?= $view->renderPartial('pdf/google_estilos', [
+<?= $view->renderPartial('pdf/portada', [
     'cliente' => $cliente,
     'subtitulo' => 'Reporte Google Ads',
     'detalle' => $campanias_asignadas_count . ' campaña' . ($campanias_asignadas_count === 1 ? '' : 's') . ' asignada' . ($campanias_asignadas_count === 1 ? '' : 's'),

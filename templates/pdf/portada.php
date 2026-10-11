@@ -1,6 +1,6 @@
 <?php
 /**
- * Estilos y portada compartidos por los PDF de Google Ads y Google Analytics
+ * Estilos y portada compartidos por los PDF de Google y el comparativo
  * (mismo look que templates/pdf/reporte.php).
  *
  * @var \MisterCo\Reports\Core\View $view

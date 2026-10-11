@@ -20,6 +20,7 @@ use MisterCo\Reports\Controllers\Cliente\CampaniaController as ClienteCampaniaCo
 use MisterCo\Reports\Controllers\Cliente\DashboardController as ClienteDashboardController;
 use MisterCo\Reports\Controllers\Cliente\PreferenciasController as ClientePreferenciasController;
 use MisterCo\Reports\Controllers\Cliente\ReporteController as ClienteReporteController;
+use MisterCo\Reports\Controllers\ComparativoController;
 use MisterCo\Reports\Controllers\GoogleReporteController;
 use MisterCo\Reports\Controllers\HomeController;
 use MisterCo\Reports\Controllers\PasswordResetController;
@@ -101,6 +102,10 @@ return function (Router $router): void {
     $router->get('/admin/clientes/{id}/analytics/reporte', [GoogleReporteController::class, 'analyticsPrevia'], $admin);
     $router->post('/admin/clientes/{id}/analytics/reporte.pdf', [GoogleReporteController::class, 'analyticsPdf'], $adminCsrf);
 
+    // Comparativo de campañas del cliente (mismo controlador que el cliente)
+    $router->get('/admin/clientes/{id}/comparar', [ComparativoController::class, 'mostrar'], $admin);
+    $router->post('/admin/clientes/{id}/comparar/reporte.pdf', [ComparativoController::class, 'pdf'], $adminCsrf);
+
     // Permisos avanzados por cliente (anuncios + métricas; campañas se asignan en /admin/clientes/{id})
     $router->get('/admin/clientes/{id}/permisos', [PermisosController::class, 'mostrar'], $admin);
     $router->post('/admin/clientes/{id}/permisos/anuncios', [PermisosController::class, 'guardarAnuncios'], $adminCsrf);
@@ -143,6 +148,9 @@ return function (Router $router): void {
     $router->get('/cliente/reporte/previa', [ClienteReporteController::class, 'previa'], $cliente);
     $router->post('/cliente/reporte.pdf', [ClienteReporteController::class, 'descargar'], $clienteCsrf);
     $router->post('/cliente/campanias/{id}/reporte.pdf', [ClienteReporteController::class, 'descargarCampania'], $clienteCsrf);
+
+    $router->get('/cliente/comparar', [ComparativoController::class, 'mostrar'], $cliente);
+    $router->post('/cliente/comparar/reporte.pdf', [ComparativoController::class, 'pdf'], $clienteCsrf);
 
     $router->get('/cliente/google-ads', [GoogleReporteController::class, 'adsDashboard'], $cliente);
     $router->get('/cliente/google-ads/reporte', [GoogleReporteController::class, 'adsPrevia'], $cliente);

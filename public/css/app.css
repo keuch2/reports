@@ -447,3 +447,10 @@ details pre {
     white-space: pre-wrap;
     word-break: break-word;
 }
+
+/* Reporte comparativo */
+.comparativo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.comparativo-grid > .card { margin: 0; }
+@media (max-width: 760px) { .comparativo-grid { grid-template-columns: 1fr; } }
+.variacion--mejor { color: #047857; font-weight: 600; }
+.variacion--peor { color: #b91c1c; font-weight: 600; }

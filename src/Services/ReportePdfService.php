@@ -198,7 +198,7 @@ final class ReportePdfService
         ?string $comentarios = null,
         bool $marcaDeAgua = false,
     ): array {
-        return $this->generarGoogle('pdf/google_ads', 'google_ads', $this->google->datosAds($clienteId, $desde, $hasta),
+        return $this->generarConPlantilla('pdf/google_ads', 'google_ads', $this->google->datosAds($clienteId, $desde, $hasta),
             $clienteId, $desde, $hasta, $generadoPorUsuarioId, $comentarios, $marcaDeAgua);
     }
 
@@ -215,7 +215,28 @@ final class ReportePdfService
         ?string $comentarios = null,
         bool $marcaDeAgua = false,
     ): array {
-        return $this->generarGoogle('pdf/google_analytics', 'google_analytics', $this->google->datosAnalytics($clienteId, $desde, $hasta),
+        return $this->generarConPlantilla('pdf/google_analytics', 'google_analytics', $this->google->datosAnalytics($clienteId, $desde, $hasta),
+            $clienteId, $desde, $hasta, $generadoPorUsuarioId, $comentarios, $marcaDeAgua);
+    }
+
+    /**
+     * PDF del reporte comparativo (ver ComparativoService::comparar). El período
+     * registrado en el histórico abarca ambos rangos.
+     *
+     * @param array{a: array<string,mixed>, b: array<string,mixed>, filas: list<array<string,mixed>>, misma_moneda: bool} $comparacion
+     * @return array{ruta:string, nombre:string, tamanio:int}
+     */
+    public function generarComparativo(
+        int $clienteId,
+        array $comparacion,
+        int $generadoPorUsuarioId,
+        ?string $comentarios = null,
+        bool $marcaDeAgua = false,
+    ): array {
+        $desde = min($comparacion['a']['desde'], $comparacion['b']['desde']);
+        $hasta = max($comparacion['a']['hasta'], $comparacion['b']['hasta']);
+
+        return $this->generarConPlantilla('pdf/comparativo', 'comparativo', $comparacion,
             $clienteId, $desde, $hasta, $generadoPorUsuarioId, $comentarios, $marcaDeAgua);
     }
 
@@ -223,7 +244,7 @@ final class ReportePdfService
      * @param array<string, mixed> $datos
      * @return array{ruta:string, nombre:string, tamanio:int}
      */
-    private function generarGoogle(
+    private function generarConPlantilla(
         string $plantilla,
         string $prefijoArchivo,
         array $datos,

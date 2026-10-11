@@ -10,7 +10,7 @@
 
 $volver = $view->url($base) . '?' . $periodo->query();
 ?>
-<?= $view->renderPartial('partials/google_encabezado', [
+<?= $view->renderPartial('partials/encabezado_cliente', [
     'usuario' => $usuario, 'cliente' => $cliente, 'es_admin' => $es_admin,
     'seccion' => str_contains($base, 'google-ads') ? 'google_ads' : 'analytics',
     'descripcion' => 'Reporte PDF de ' . $nombre_fuente,

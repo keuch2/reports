@@ -1,13 +1,13 @@
 <?php
 /**
- * Encabezado de las pantallas de Google Ads / Analytics: header del cliente, o
+ * Encabezado de las pantallas por cliente (Google, comparativo): header del cliente, o
  * header admin + banner de vista previa cuando las ve el admin.
  *
  * @var \MisterCo\Reports\Core\View $view
  * @var \MisterCo\Reports\Domain\Usuario $usuario
  * @var array<string,mixed> $cliente
  * @var bool $es_admin
- * @var string $seccion 'google_ads' | 'analytics'
+ * @var string $seccion Sección activa del menú del cliente.
  * @var string $descripcion Texto del banner de preview.
  */
 ?>

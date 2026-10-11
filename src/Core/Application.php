@@ -21,6 +21,7 @@ use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\AuthService;
 use MisterCo\Reports\Services\DashboardPreferenciasService;
 use MisterCo\Reports\Services\AnalisisCampaniaService;
+use MisterCo\Reports\Services\ComparativoService;
 use MisterCo\Reports\Services\DashboardService;
 use MisterCo\Reports\Services\Google\GoogleImportacionService;
 use MisterCo\Reports\Services\Google\GoogleOAuthService;
@@ -144,6 +145,11 @@ final class Application
         $container->bind(DashboardService::class, fn (Container $c) => new DashboardService(
             $c->get(Database::class),
             $c->get(PermisosService::class),
+        ));
+        $container->bind(ComparativoService::class, fn (Container $c) => new ComparativoService(
+            $c->get(DashboardService::class),
+            $c->get(EntidadesMetaRepository::class),
+            $c->get(GoogleAdsRepository::class),
         ));
         $container->bind(DashboardPreferenciasService::class, fn (Container $c) => new DashboardPreferenciasService($c->get(Database::class)));
         $container->bind(AnalisisCampaniaService::class, fn () => new AnalisisCampaniaService());

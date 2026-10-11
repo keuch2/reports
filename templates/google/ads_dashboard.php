@@ -25,7 +25,7 @@ $fmtPct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 2, '
 $conMoneda = static fn ($v) => $v === null ? '—' : $mon . ' ' . $fmtMoneda($v);
 $hayValor = (float) ($totales['valor_conversiones'] ?? 0) > 0;
 ?>
-<?= $view->renderPartial('partials/google_encabezado', [
+<?= $view->renderPartial('partials/encabezado_cliente', [
     'usuario' => $usuario, 'cliente' => $cliente, 'es_admin' => $es_admin,
     'seccion' => 'google_ads', 'descripcion' => 'Vista previa de Google Ads',
 ]) ?>
