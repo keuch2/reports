@@ -93,7 +93,7 @@
                     </p>
                     <label style="display:flex;gap:0.5rem;align-items:center;cursor:pointer;margin:0">
                         <input type="checkbox" id="solo-activas" checked>
-                        <span>Solo campañas con actividad entre las fechas elegidas</span>
+                        <span>Solo campañas con gasto entre las fechas elegidas <small class="muted">(incluye pausadas y archivadas)</small></span>
                     </label>
                     <input type="search" id="campanias-filtro" class="field__input" autocomplete="off"
                            placeholder="Filtrar por nombre… (ej. Agrodinamica 2023)" aria-label="Filtrar campañas por nombre">
@@ -177,6 +177,7 @@ const urlCampanias = '<?= $view->url('/admin/importar/campanias') ?>';
 
 // Cache de campañas en vivo por cuenta + rango (evita re-consultar Meta al re-tildar).
 const cacheEnVivo = {};
+let monedaCuenta = '';
 
 // Rango a consultar: solo si "Solo con actividad" está marcado y las fechas son válidas.
 function rangoActividad() {
@@ -200,10 +201,11 @@ function pintarLista(camps) {
     lista.innerHTML = camps.map(c => {
         const obj = c.objetivo ? ` <small style="color:var(--color-muted)">· ${esc(c.objetivo)}</small>` : '';
         const est = c.estado ? ` <small style="color:var(--color-muted)">· ${esc(c.estado)}</small>` : '';
-        const imp = c.impresiones ? ` <small style="color:var(--color-muted)">· ${Number(c.impresiones).toLocaleString('es-PY')} impresiones</small>` : '';
+        const gasto = c.gasto ? ` <small style="color:var(--color-muted)">· gasto ${esc(monedaCuenta)} ${Number(c.gasto).toLocaleString('es-PY', { maximumFractionDigits: monedaCuenta === 'PYG' ? 0 : 2 })}</small>` : '';
+        const res = c.resultados ? ` <small style="color:var(--color-muted)">· ${Number(c.resultados).toLocaleString('es-PY')} resultados</small>` : '';
         return `<label data-nombre="${esc(normalizar(c.nombre))}" style="display:flex;gap:0.5rem;align-items:flex-start;padding:0.25rem 0">
             <input type="checkbox" name="campanias_meta_ids[]" value="${esc(c.meta_id)}">
-            <span><strong>${esc(c.nombre)}</strong>${obj}${est}${imp}</span>
+            <span><strong>${esc(c.nombre)}</strong>${obj}${est}${gasto}${res}</span>
         </label>`;
     }).join('');
     lista.querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = marcadas.has(c.value); });
@@ -234,7 +236,7 @@ async function cargarCampaniasEnVivo(cuentaId) {
     fieldset.style.display = '';
     const rango = rangoActividad();
     const clave = cuentaId + '|' + (rango ? rango.desde + '|' + rango.hasta : 'todas');
-    if (cacheEnVivo[clave]) { mostrarCampanias(cacheEnVivo[clave], rango); return; }
+    if (cacheEnVivo[clave]) { monedaCuenta = cacheEnVivo[clave].moneda; mostrarCampanias(cacheEnVivo[clave].campanias, rango); return; }
 
     const marcadasAntes = new Set([...lista.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value));
     lista.innerHTML = '<p class="muted" style="margin:0.5rem">Cargando campañas desde Meta…</p>';
@@ -252,10 +254,11 @@ async function cargarCampaniasEnVivo(cuentaId) {
             modoLabel.textContent = 'Error al cargar';
             return;
         }
-        cacheEnVivo[clave] = data.campanias || [];
+        cacheEnVivo[clave] = { campanias: data.campanias || [], moneda: data.moneda || '' };
+        monedaCuenta = cacheEnVivo[clave].moneda;
         // Restaurar las marcas previas antes de pintar (el placeholder de carga las borró).
         lista.innerHTML = [...marcadasAntes].map(v => `<input type="checkbox" value="${esc(v)}" checked hidden>`).join('');
-        mostrarCampanias(cacheEnVivo[clave], rango);
+        mostrarCampanias(cacheEnVivo[clave].campanias, rango);
     } catch (e) {
         lista.innerHTML = '<p class="alert alert--error" style="margin:0.5rem">Error de red al consultar Meta.</p>';
         modoLabel.textContent = 'Error al cargar';
@@ -265,7 +268,7 @@ async function cargarCampaniasEnVivo(cuentaId) {
 function mostrarCampanias(camps, rango) {
     if (camps.length === 0) {
         lista.innerHTML = '<p class="muted" style="margin:0.5rem">' + (rango
-            ? `Ninguna campaña tuvo actividad entre ${esc(rango.desde)} y ${esc(rango.hasta)}. Desmarcá "Solo campañas con actividad" para ver todas.`
+            ? `Ninguna campaña generó gasto entre ${esc(rango.desde)} y ${esc(rango.hasta)}. Desmarcá "Solo campañas con gasto" para ver todas.`
             : 'Esta cuenta no tiene campañas en Meta.') + '</p>';
         modoLabel.textContent = 'Sin campañas';
         return;

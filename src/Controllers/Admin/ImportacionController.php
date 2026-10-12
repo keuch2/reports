@@ -85,7 +85,9 @@ final class ImportacionController
                 ? $service->listarCampaniasDeMeta($cuentaId, $desde, $hasta)
                 : $service->listarCampaniasDeMeta($cuentaId);
 
-            return Response::json(['campanias' => $campanias]);
+            $cuenta = $this->container->get(CuentaPublicitariaRepository::class)->buscarPorId($cuentaId);
+
+            return Response::json(['campanias' => $campanias, 'moneda' => (string) ($cuenta['moneda'] ?? '')]);
         } catch (MetaApiException $e) {
             $msg = $e->esTokenInvalido()
                 ? 'El token de Meta es inválido o expiró. Reconectá la cuenta.'

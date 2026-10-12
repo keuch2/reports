@@ -468,11 +468,13 @@ final class ImportacionService
      * Sirve para que la UI de importación selectiva muestre también campañas
      * nuevas/completadas que todavía no fueron importadas al sistema.
      *
-     * Con rango, devuelve solo las campañas que tuvieron entrega (impresiones)
-     * en esas fechas: el endpoint de insights a nivel campaña omite las que no
-     * tuvieron actividad. Cada una trae además sus impresiones del rango.
+     * Con rango, devuelve solo las campañas que generaron gasto en esas fechas,
+     * cualquiera sea su estado actual (activas, pausadas, archivadas), con su
+     * gasto y resultados del rango. Primero se consultan los insights a nivel
+     * campaña y después se piden a Meta solo esas campañas, en vez de recorrer
+     * todas las de la cuenta.
      *
-     * @return list<array{meta_id:string, nombre:string, objetivo:string, estado:string, impresiones?:int}>
+     * @return list<array{meta_id:string, nombre:string, objetivo:string, estado:string, gasto?:float, resultados?:?int}>
      */
     public function listarCampaniasDeMeta(int $cuentaId, ?string $desde = null, ?string $hasta = null): array
     {
@@ -489,40 +491,70 @@ final class ImportacionService
             'limit' => 200,
         ];
 
-        $impresionesPorCampania = null;
-        if ($desde !== null && $hasta !== null) {
-            $impresionesPorCampania = [];
-            foreach ($cliente->paginar("act_{$metaAccountId}/insights", [
-                'level' => 'campaign',
-                'time_range' => json_encode(['since' => $desde, 'until' => $hasta]),
-                'fields' => ['campaign_id', 'impressions'],
-                'limit' => 500,
-            ]) as $i) {
-                if ((int) ($i['impressions'] ?? 0) > 0) {
-                    $impresionesPorCampania[(string) $i['campaign_id']] = (int) $i['impressions'];
-                }
+        // Sin rango: todas las campañas de la cuenta.
+        if ($desde === null || $hasta === null) {
+            $campanias = [];
+            foreach ($cliente->paginar("act_{$metaAccountId}/campaigns", $query) as $c) {
+                $campanias[] = $this->campaniaParaLista($c);
+            }
+
+            return $this->ordenarPorNombre($campanias);
+        }
+
+        // Con rango: campañas con gasto en esas fechas. `results` no viene en
+        // todos los tipos de campaña (el importador lo deduce de `actions`),
+        // así que no se exige: el criterio es el gasto.
+        $actividad = [];
+        foreach ($cliente->paginar("act_{$metaAccountId}/insights", [
+            'level' => 'campaign',
+            'time_range' => json_encode(['since' => $desde, 'until' => $hasta]),
+            'fields' => ['campaign_id', 'spend', 'results'],
+            'limit' => 500,
+        ]) as $i) {
+            $gasto = (float) ($i['spend'] ?? 0);
+            if ($gasto > 0) {
+                $actividad[(string) $i['campaign_id']] = [
+                    'gasto' => $gasto,
+                    'resultados' => isset($i['results'][0]['values'][0]['value'])
+                        ? (int) $i['results'][0]['values'][0]['value']
+                        : null,
+                ];
             }
         }
 
         $campanias = [];
-        foreach ($cliente->paginar("act_{$metaAccountId}/campaigns", $query) as $c) {
-            $id = (string) $c['id'];
-            if ($impresionesPorCampania !== null && !isset($impresionesPorCampania[$id])) {
-                continue;
+        foreach (array_chunk(array_keys($actividad), 100) as $ids) {
+            $query['filtering'] = json_encode([['field' => 'campaign.id', 'operator' => 'IN', 'value' => $ids]]);
+            foreach ($cliente->paginar("act_{$metaAccountId}/campaigns", $query) as $c) {
+                $campanias[] = $this->campaniaParaLista($c) + $actividad[(string) $c['id']];
             }
-            $campania = [
-                'meta_id' => $id,
-                'nombre' => (string) ($c['name'] ?? 'Sin nombre'),
-                'objetivo' => (string) ($c['objective'] ?? ''),
-                'estado' => (string) ($c['status'] ?? ''),
-            ];
-            if ($impresionesPorCampania !== null) {
-                $campania['impresiones'] = $impresionesPorCampania[$id];
-            }
-            $campanias[] = $campania;
         }
 
-        // Orden alfabético para que la lista sea navegable.
+        return $this->ordenarPorNombre($campanias);
+    }
+
+    /**
+     * @param array<string,mixed> $c
+     * @return array{meta_id:string, nombre:string, objetivo:string, estado:string}
+     */
+    private function campaniaParaLista(array $c): array
+    {
+        return [
+            'meta_id' => (string) $c['id'],
+            'nombre' => (string) ($c['name'] ?? 'Sin nombre'),
+            'objetivo' => (string) ($c['objective'] ?? ''),
+            'estado' => (string) ($c['status'] ?? ''),
+        ];
+    }
+
+    /**
+     * Orden alfabético para que la lista sea navegable.
+     *
+     * @param list<array<string,mixed>> $campanias
+     * @return list<array<string,mixed>>
+     */
+    private function ordenarPorNombre(array $campanias): array
+    {
         usort($campanias, static fn ($a, $b) => strcasecmp($a['nombre'], $b['nombre']));
 
         return $campanias;
