@@ -64,12 +64,12 @@
                 <div class="field-row">
                     <label class="field">
                         <span class="field__label">Desde</span>
-                        <input class="field__input" type="date" name="rango_inicio"
+                        <input class="field__input" type="date" name="rango_inicio" id="rango-inicio"
                                value="<?= $view->e($rango_inicio_default) ?>" required>
                     </label>
                     <label class="field">
                         <span class="field__label">Hasta</span>
-                        <input class="field__input" type="date" name="rango_fin"
+                        <input class="field__input" type="date" name="rango_fin" id="rango-fin"
                                value="<?= $view->e($rango_fin_default) ?>" required>
                     </label>
                 </div>
@@ -91,6 +91,10 @@
                         — <button type="button" class="btn btn--link" id="btn-todas" style="padding:0">Marcar todas</button>
                         / <button type="button" class="btn btn--link" id="btn-ninguna" style="padding:0">Ninguna</button>
                     </p>
+                    <label style="display:flex;gap:0.5rem;align-items:center;cursor:pointer;margin:0">
+                        <input type="checkbox" id="solo-activas" checked>
+                        <span>Solo campañas con actividad entre las fechas elegidas</span>
+                    </label>
                     <input type="search" id="campanias-filtro" class="field__input" autocomplete="off"
                            placeholder="Filtrar por nombre… (ej. Agrodinamica 2023)" aria-label="Filtrar campañas por nombre">
                     <div id="campanias-lista" style="max-height:360px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius);padding:0.5rem"></div>
@@ -166,10 +170,19 @@ const modoLabel = document.getElementById('campanias-modo');
 const importarTodoBox = document.getElementById('importar-todo-box');
 const importarTodo = document.getElementById('importar-todo');
 const filtro = document.getElementById('campanias-filtro');
+const soloActivas = document.getElementById('solo-activas');
+const rangoInicio = document.getElementById('rango-inicio');
+const rangoFin = document.getElementById('rango-fin');
 const urlCampanias = '<?= $view->url('/admin/importar/campanias') ?>';
 
-// Cache de campañas en vivo por cuenta (evita re-consultar Meta al re-tildar).
+// Cache de campañas en vivo por cuenta + rango (evita re-consultar Meta al re-tildar).
 const cacheEnVivo = {};
+
+// Rango a consultar: solo si "Solo con actividad" está marcado y las fechas son válidas.
+function rangoActividad() {
+    const desde = rangoInicio.value, hasta = rangoFin.value;
+    return soloActivas.checked && desde && hasta && desde <= hasta ? { desde, hasta } : null;
+}
 
 // Los nombres vienen de Meta: se escapan antes de insertarlos como HTML.
 function esc(s) {
@@ -182,16 +195,19 @@ function normalizar(s) {
 }
 
 function pintarLista(camps) {
+    // Al recargar (otro rango) se conservan las campañas que ya estaban marcadas.
+    const marcadas = new Set([...lista.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value));
     lista.innerHTML = camps.map(c => {
         const obj = c.objetivo ? ` <small style="color:var(--color-muted)">· ${esc(c.objetivo)}</small>` : '';
         const est = c.estado ? ` <small style="color:var(--color-muted)">· ${esc(c.estado)}</small>` : '';
+        const imp = c.impresiones ? ` <small style="color:var(--color-muted)">· ${Number(c.impresiones).toLocaleString('es-PY')} impresiones</small>` : '';
         return `<label data-nombre="${esc(normalizar(c.nombre))}" style="display:flex;gap:0.5rem;align-items:flex-start;padding:0.25rem 0">
             <input type="checkbox" name="campanias_meta_ids[]" value="${esc(c.meta_id)}">
-            <span><strong>${esc(c.nombre)}</strong>${obj}${est}</span>
+            <span><strong>${esc(c.nombre)}</strong>${obj}${est}${imp}</span>
         </label>`;
     }).join('');
-    filtro.value = '';
-    actualizarModoLabel();
+    lista.querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = marcadas.has(c.value); });
+    aplicarFiltro();
 }
 
 // Cada palabra del filtro tiene que aparecer en el nombre, en cualquier orden.
@@ -216,12 +232,17 @@ function checkboxesVisibles() {
 async function cargarCampaniasEnVivo(cuentaId) {
     if (!cuentaId) return;
     fieldset.style.display = '';
-    if (cacheEnVivo[cuentaId]) { pintarLista(cacheEnVivo[cuentaId]); return; }
+    const rango = rangoActividad();
+    const clave = cuentaId + '|' + (rango ? rango.desde + '|' + rango.hasta : 'todas');
+    if (cacheEnVivo[clave]) { mostrarCampanias(cacheEnVivo[clave], rango); return; }
 
+    const marcadasAntes = new Set([...lista.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value));
     lista.innerHTML = '<p class="muted" style="margin:0.5rem">Cargando campañas desde Meta…</p>';
     modoLabel.textContent = 'Cargando…';
     try {
-        const resp = await fetch(urlCampanias + '?cuenta_id=' + encodeURIComponent(cuentaId), {
+        const params = new URLSearchParams({ cuenta_id: cuentaId });
+        if (rango) { params.set('desde', rango.desde); params.set('hasta', rango.hasta); }
+        const resp = await fetch(urlCampanias + '?' + params.toString(), {
             headers: { 'Accept': 'application/json' },
         });
         const data = await resp.json();
@@ -231,17 +252,25 @@ async function cargarCampaniasEnVivo(cuentaId) {
             modoLabel.textContent = 'Error al cargar';
             return;
         }
-        cacheEnVivo[cuentaId] = data.campanias || [];
-        if (cacheEnVivo[cuentaId].length === 0) {
-            lista.innerHTML = '<p class="muted" style="margin:0.5rem">Esta cuenta no tiene campañas en Meta.</p>';
-            modoLabel.textContent = 'Sin campañas';
-            return;
-        }
-        pintarLista(cacheEnVivo[cuentaId]);
+        cacheEnVivo[clave] = data.campanias || [];
+        // Restaurar las marcas previas antes de pintar (el placeholder de carga las borró).
+        lista.innerHTML = [...marcadasAntes].map(v => `<input type="checkbox" value="${esc(v)}" checked hidden>`).join('');
+        mostrarCampanias(cacheEnVivo[clave], rango);
     } catch (e) {
         lista.innerHTML = '<p class="alert alert--error" style="margin:0.5rem">Error de red al consultar Meta.</p>';
         modoLabel.textContent = 'Error al cargar';
     }
+}
+
+function mostrarCampanias(camps, rango) {
+    if (camps.length === 0) {
+        lista.innerHTML = '<p class="muted" style="margin:0.5rem">' + (rango
+            ? `Ninguna campaña tuvo actividad entre ${esc(rango.desde)} y ${esc(rango.hasta)}. Desmarcá "Solo campañas con actividad" para ver todas.`
+            : 'Esta cuenta no tiene campañas en Meta.') + '</p>';
+        modoLabel.textContent = 'Sin campañas';
+        return;
+    }
+    pintarLista(camps);
 }
 
 function alElegirCuenta(cuentaId) {
@@ -278,6 +307,18 @@ cuentaSelect.addEventListener('change', () => alElegirCuenta(cuentaSelect.value)
 lista.addEventListener('change', actualizarModoLabel);
 importarTodo.addEventListener('change', aplicarModoImportarTodo);
 filtro.addEventListener('input', aplicarFiltro);
+
+// Cambiar el rango o la casilla de actividad recarga la lista (con una pequeña espera
+// para no consultar Meta en cada tecla de la fecha).
+let recargaPendiente = null;
+function recargarSiSelectivo() {
+    if (importarTodo.checked || !cuentaSelect.value) return;
+    clearTimeout(recargaPendiente);
+    recargaPendiente = setTimeout(() => cargarCampaniasEnVivo(cuentaSelect.value), 400);
+}
+soloActivas.addEventListener('change', recargarSiSelectivo);
+rangoInicio.addEventListener('change', recargarSiSelectivo);
+rangoFin.addEventListener('change', recargarSiSelectivo);
 // Enter en el filtro no debe disparar la importación.
 filtro.addEventListener('keydown', ev => { if (ev.key === 'Enter') ev.preventDefault(); });
 
@@ -325,5 +366,6 @@ document.getElementById('btn-incremental')?.addEventListener('click', function (
     inputDesde.value = d.toISOString().slice(0, 10);
     inputHasta.value = hoy;
     hint.textContent = `Rango ajustado: ${inputDesde.value} → ${hoy}`;
+    recargarSiSelectivo();
 });
 </script>

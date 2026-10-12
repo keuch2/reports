@@ -468,9 +468,13 @@ final class ImportacionService
      * Sirve para que la UI de importación selectiva muestre también campañas
      * nuevas/completadas que todavía no fueron importadas al sistema.
      *
-     * @return list<array{meta_id:string, nombre:string, objetivo:string, estado:string}>
+     * Con rango, devuelve solo las campañas que tuvieron entrega (impresiones)
+     * en esas fechas: el endpoint de insights a nivel campaña omite las que no
+     * tuvieron actividad. Cada una trae además sus impresiones del rango.
+     *
+     * @return list<array{meta_id:string, nombre:string, objetivo:string, estado:string, impresiones?:int}>
      */
-    public function listarCampaniasDeMeta(int $cuentaId): array
+    public function listarCampaniasDeMeta(int $cuentaId, ?string $desde = null, ?string $hasta = null): array
     {
         $cuenta = $this->cuentasRepo->buscarPorId($cuentaId);
         if ($cuenta === null) {
@@ -485,14 +489,37 @@ final class ImportacionService
             'limit' => 200,
         ];
 
+        $impresionesPorCampania = null;
+        if ($desde !== null && $hasta !== null) {
+            $impresionesPorCampania = [];
+            foreach ($cliente->paginar("act_{$metaAccountId}/insights", [
+                'level' => 'campaign',
+                'time_range' => json_encode(['since' => $desde, 'until' => $hasta]),
+                'fields' => ['campaign_id', 'impressions'],
+                'limit' => 500,
+            ]) as $i) {
+                if ((int) ($i['impressions'] ?? 0) > 0) {
+                    $impresionesPorCampania[(string) $i['campaign_id']] = (int) $i['impressions'];
+                }
+            }
+        }
+
         $campanias = [];
         foreach ($cliente->paginar("act_{$metaAccountId}/campaigns", $query) as $c) {
-            $campanias[] = [
-                'meta_id' => (string) $c['id'],
+            $id = (string) $c['id'];
+            if ($impresionesPorCampania !== null && !isset($impresionesPorCampania[$id])) {
+                continue;
+            }
+            $campania = [
+                'meta_id' => $id,
                 'nombre' => (string) ($c['name'] ?? 'Sin nombre'),
                 'objetivo' => (string) ($c['objective'] ?? ''),
                 'estado' => (string) ($c['status'] ?? ''),
             ];
+            if ($impresionesPorCampania !== null) {
+                $campania['impresiones'] = $impresionesPorCampania[$id];
+            }
+            $campanias[] = $campania;
         }
 
         // Orden alfabético para que la lista sea navegable.

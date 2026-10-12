@@ -77,7 +77,13 @@ final class ImportacionController
 
         try {
             $service = $this->container->get(ImportacionService::class);
-            $campanias = $service->listarCampaniasDeMeta($cuentaId);
+            // Con rango válido, solo las campañas con entrega en esas fechas.
+            $desde = (string) $request->input('desde', '');
+            $hasta = (string) $request->input('hasta', '');
+            $conRango = $this->validarFecha($desde) && $this->validarFecha($hasta) && $desde <= $hasta;
+            $campanias = $conRango
+                ? $service->listarCampaniasDeMeta($cuentaId, $desde, $hasta)
+                : $service->listarCampaniasDeMeta($cuentaId);
 
             return Response::json(['campanias' => $campanias]);
         } catch (MetaApiException $e) {
