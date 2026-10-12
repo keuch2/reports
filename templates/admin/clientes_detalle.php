@@ -156,8 +156,13 @@ $ga4Set = array_flip($ga4_ids_asignadas);
         <?php if ($cuentas_con_campanias === []): ?>
             <p class="muted">No hay cuentas publicitarias importadas. <a href="<?= $view->url('/admin/meta') ?>">Conectá Meta</a> e <a href="<?= $view->url('/admin/importar') ?>">importá una cuenta</a> primero.</p>
         <?php else: ?>
-            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/asignar') ?>">
+            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/asignar') ?>" data-filtro-campanias>
                 <?= $view->csrfField() ?>
+                <div class="filtro-campanias">
+                    <input type="search" class="field__input" data-filtro-input autocomplete="off"
+                           placeholder="Filtrar campañas por nombre… (ej. Costa Marfil 2026)" aria-label="Filtrar campañas por nombre">
+                    <small class="muted" data-filtro-info></small>
+                </div>
 
                 <?php foreach ($cuentas_con_campanias as $bloque): ?>
                     <?php $cuenta = $bloque['cuenta']; $campanias = $bloque['campanias']; ?>
@@ -205,8 +210,13 @@ $ga4Set = array_flip($ga4_ids_asignadas);
         <?php if ($google_ads_cuentas === []): ?>
             <p class="muted">No hay cuentas de Google Ads sincronizadas. <a href="<?= $view->url('/admin/google') ?>">Conectá Google</a> e importá una cuenta primero.</p>
         <?php else: ?>
-            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/asignar-google-ads') ?>">
+            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/asignar-google-ads') ?>" data-filtro-campanias>
                 <?= $view->csrfField() ?>
+                <div class="filtro-campanias">
+                    <input type="search" class="field__input" data-filtro-input autocomplete="off"
+                           placeholder="Filtrar campañas por nombre… (ej. Costa Marfil 2026)" aria-label="Filtrar campañas por nombre">
+                    <small class="muted" data-filtro-info></small>
+                </div>
                 <?php foreach ($google_ads_cuentas as $bloque): ?>
                     <?php $cuenta = $bloque['cuenta']; if ($bloque['campanias'] === []) continue; ?>
                     <fieldset class="fieldset" style="margin-top:1rem">
@@ -273,14 +283,40 @@ $ga4Set = array_flip($ga4_ids_asignadas);
 </section>
 
 <script>
+// Minúsculas y sin tildes, para que "interaccion" encuentre "Interacción".
+const normalizar = s => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const filaVisible = tr => tr.style.display !== 'none';
+
+// "Marcar todas" alterna solo las campañas visibles de esa cuenta (respeta el filtro).
 document.querySelectorAll('[data-toggle-all]').forEach(btn => {
     btn.addEventListener('click', () => {
-        const cuentaId = btn.dataset.toggleAll;
-        const checks = document.querySelectorAll(`table[data-cuenta="${cuentaId}"] input[type="checkbox"]`);
-        const total = checks.length;
-        const marcados = [...checks].filter(c => c.checked).length;
-        const nuevoEstado = marcados < total;
+        const filas = [...document.querySelectorAll(`table[data-cuenta="${btn.dataset.toggleAll}"] tbody tr`)].filter(filaVisible);
+        const checks = filas.map(tr => tr.querySelector('input[type="checkbox"]'));
+        const nuevoEstado = checks.some(c => !c.checked);
         checks.forEach(c => c.checked = nuevoEstado);
+    });
+});
+
+// Filtro por nombre: cada palabra tiene que aparecer en el nombre, en cualquier orden.
+// Las campañas ocultas conservan su marca y se guardan igual al enviar.
+document.querySelectorAll('form[data-filtro-campanias]').forEach(form => {
+    const input = form.querySelector('[data-filtro-input]');
+    const info = form.querySelector('[data-filtro-info]');
+    const filas = [...form.querySelectorAll('table[data-cuenta] tbody tr')];
+    filas.forEach(tr => tr.dataset.nombre = normalizar(tr.cells[1].textContent));
+
+    input.addEventListener('keydown', ev => { if (ev.key === 'Enter') ev.preventDefault(); });
+    input.addEventListener('input', () => {
+        const palabras = normalizar(input.value).split(/\s+/).filter(Boolean);
+        filas.forEach(tr => {
+            tr.style.display = palabras.every(p => tr.dataset.nombre.includes(p)) ? '' : 'none';
+        });
+        form.querySelectorAll('fieldset').forEach(fs => {
+            fs.style.display = [...fs.querySelectorAll('tbody tr')].some(filaVisible) ? '' : 'none';
+        });
+        const visibles = filas.filter(filaVisible).length;
+        info.textContent = palabras.length === 0 ? ''
+            : (visibles === 0 ? 'Ninguna campaña coincide con el filtro.' : `${visibles} de ${filas.length} campañas coinciden.`);
     });
 });
 </script>

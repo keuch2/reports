@@ -454,3 +454,6 @@ details pre {
 @media (max-width: 760px) { .comparativo-grid { grid-template-columns: 1fr; } }
 .variacion--mejor { color: #047857; font-weight: 600; }
 .variacion--peor { color: #b91c1c; font-weight: 600; }
+
+/* Filtro de campañas en la asignación al cliente */
+.filtro-campanias { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.75rem; }
