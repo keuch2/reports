@@ -91,6 +91,8 @@
                         — <button type="button" class="btn btn--link" id="btn-todas" style="padding:0">Marcar todas</button>
                         / <button type="button" class="btn btn--link" id="btn-ninguna" style="padding:0">Ninguna</button>
                     </p>
+                    <input type="search" id="campanias-filtro" class="field__input" autocomplete="off"
+                           placeholder="Filtrar por nombre… (ej. Agrodinamica 2023)" aria-label="Filtrar campañas por nombre">
                     <div id="campanias-lista" style="max-height:360px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius);padding:0.5rem"></div>
                     <p class="muted" style="font-size:0.85rem;margin:0">
                         Solo se importarán las campañas marcadas. Las campañas nuevas de Meta que todavía no
@@ -163,21 +165,49 @@ const lista = document.getElementById('campanias-lista');
 const modoLabel = document.getElementById('campanias-modo');
 const importarTodoBox = document.getElementById('importar-todo-box');
 const importarTodo = document.getElementById('importar-todo');
+const filtro = document.getElementById('campanias-filtro');
 const urlCampanias = '<?= $view->url('/admin/importar/campanias') ?>';
 
 // Cache de campañas en vivo por cuenta (evita re-consultar Meta al re-tildar).
 const cacheEnVivo = {};
 
+// Los nombres vienen de Meta: se escapan antes de insertarlos como HTML.
+function esc(s) {
+    return String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+// Minúsculas y sin tildes, para que "interaccion" encuentre "Interacción".
+function normalizar(s) {
+    return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 function pintarLista(camps) {
     lista.innerHTML = camps.map(c => {
-        const obj = c.objetivo ? ` <small style="color:var(--color-muted)">· ${c.objetivo}</small>` : '';
-        const est = c.estado ? ` <small style="color:var(--color-muted)">· ${c.estado}</small>` : '';
-        return `<label style="display:flex;gap:0.5rem;align-items:flex-start;padding:0.25rem 0">
-            <input type="checkbox" name="campanias_meta_ids[]" value="${c.meta_id}">
-            <span><strong>${c.nombre}</strong>${obj}${est}</span>
+        const obj = c.objetivo ? ` <small style="color:var(--color-muted)">· ${esc(c.objetivo)}</small>` : '';
+        const est = c.estado ? ` <small style="color:var(--color-muted)">· ${esc(c.estado)}</small>` : '';
+        return `<label data-nombre="${esc(normalizar(c.nombre))}" style="display:flex;gap:0.5rem;align-items:flex-start;padding:0.25rem 0">
+            <input type="checkbox" name="campanias_meta_ids[]" value="${esc(c.meta_id)}">
+            <span><strong>${esc(c.nombre)}</strong>${obj}${est}</span>
         </label>`;
     }).join('');
+    filtro.value = '';
     actualizarModoLabel();
+}
+
+// Cada palabra del filtro tiene que aparecer en el nombre, en cualquier orden.
+// Las campañas ocultas por el filtro conservan su marca y se importan igual.
+function aplicarFiltro() {
+    const palabras = normalizar(filtro.value).split(/\s+/).filter(Boolean);
+    lista.querySelectorAll('label[data-nombre]').forEach(l => {
+        l.style.display = palabras.every(p => l.dataset.nombre.includes(p)) ? 'flex' : 'none';
+    });
+    actualizarModoLabel();
+}
+
+function checkboxesVisibles() {
+    return [...lista.querySelectorAll('label[data-nombre]')]
+        .filter(l => l.style.display !== 'none')
+        .map(l => l.querySelector('input[type=checkbox]'));
 }
 
 // Carga las campañas EN VIVO desde Meta para la cuenta elegida y las muestra
@@ -237,21 +267,27 @@ function aplicarModoImportarTodo() {
 function actualizarModoLabel() {
     const marcadas = lista.querySelectorAll('input[type=checkbox]:checked').length;
     const total = lista.querySelectorAll('input[type=checkbox]').length;
-    modoLabel.textContent = marcadas === 0
+    const visibles = checkboxesVisibles().length;
+    const filtrado = filtro.value.trim() !== '' ? ` · ${visibles} coinciden con el filtro` : '';
+    modoLabel.textContent = (marcadas === 0
         ? `Ninguna marcada de ${total} — marcá al menos una`
-        : `${marcadas} de ${total} campañas seleccionadas`;
+        : `${marcadas} de ${total} campañas seleccionadas`) + filtrado;
 }
 
 cuentaSelect.addEventListener('change', () => alElegirCuenta(cuentaSelect.value));
 lista.addEventListener('change', actualizarModoLabel);
 importarTodo.addEventListener('change', aplicarModoImportarTodo);
+filtro.addEventListener('input', aplicarFiltro);
+// Enter en el filtro no debe disparar la importación.
+filtro.addEventListener('keydown', ev => { if (ev.key === 'Enter') ev.preventDefault(); });
 
+// "Marcar todas" / "Ninguna" actúan sobre las campañas visibles (las que pasan el filtro).
 document.getElementById('btn-todas').addEventListener('click', () => {
-    lista.querySelectorAll('input[type=checkbox]').forEach(c => c.checked = true);
+    checkboxesVisibles().forEach(c => c.checked = true);
     actualizarModoLabel();
 });
 document.getElementById('btn-ninguna').addEventListener('click', () => {
-    lista.querySelectorAll('input[type=checkbox]').forEach(c => c.checked = false);
+    checkboxesVisibles().forEach(c => c.checked = false);
     actualizarModoLabel();
 });
 
