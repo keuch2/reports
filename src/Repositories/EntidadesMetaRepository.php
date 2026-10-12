@@ -171,6 +171,32 @@ final class EntidadesMetaRepository
     }
 
     /**
+     * Gasto y resultados importados por campaña en un rango, solo las que
+     * generaron gasto. Sirve para filtrar la asignación de campañas por fecha.
+     *
+     * @return array<int, array{gasto: float, resultados: int}>
+     */
+    public function actividadCampanias(string $desde, string $hasta): array
+    {
+        $rows = $this->db->select(
+            "SELECT cs.campania_id, SUM(ms.gasto) AS gasto, COALESCE(SUM(ms.resultados), 0) AS resultados
+               FROM metricas_snapshots ms
+               JOIN anuncios a ON a.id = ms.entidad_id AND ms.nivel = 'ad'
+               JOIN conjuntos_anuncios cs ON cs.id = a.conjunto_anuncios_id
+              WHERE ms.fecha BETWEEN :d AND :h
+           GROUP BY cs.campania_id
+             HAVING SUM(ms.gasto) > 0",
+            ['d' => $desde, 'h' => $hasta]
+        );
+        $actividad = [];
+        foreach ($rows as $r) {
+            $actividad[(int) $r['campania_id']] = ['gasto' => (float) $r['gasto'], 'resultados' => (int) $r['resultados']];
+        }
+
+        return $actividad;
+    }
+
+    /**
      * Lista de meses (YYYY-MM) que tienen al menos un snapshot para la campaña.
      * Ordenado del más reciente al más viejo.
      *

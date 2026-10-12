@@ -457,3 +457,6 @@ details pre {
 
 /* Filtro de campañas en la asignación al cliente */
 .filtro-campanias { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.75rem; }
+.filtro-campanias__rango { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.filtro-campanias__rango .field__input { width: auto; }
+.filtro-campanias__check { display: flex; gap: 0.4rem; align-items: center; cursor: pointer; margin: 0; }

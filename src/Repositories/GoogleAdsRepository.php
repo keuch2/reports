@@ -104,6 +104,30 @@ final class GoogleAdsRepository
         }
     }
 
+    /**
+     * Gasto y conversiones importados por campaña en un rango, solo las que
+     * generaron gasto. Sirve para filtrar la asignación de campañas por fecha.
+     *
+     * @return array<int, array{gasto: float, resultados: float}>
+     */
+    public function actividadCampanias(string $desde, string $hasta): array
+    {
+        $rows = $this->db->select(
+            'SELECT campania_id, SUM(gasto) AS gasto, SUM(conversiones) AS resultados
+               FROM google_ads_metricas_diarias
+              WHERE fecha BETWEEN :d AND :h
+           GROUP BY campania_id
+             HAVING SUM(gasto) > 0',
+            ['d' => $desde, 'h' => $hasta]
+        );
+        $actividad = [];
+        foreach ($rows as $r) {
+            $actividad[(int) $r['campania_id']] = ['gasto' => (float) $r['gasto'], 'resultados' => (float) $r['resultados']];
+        }
+
+        return $actividad;
+    }
+
     /** @return list<array<string, mixed>> Campañas de una cuenta (para asignar a clientes). */
     public function campaniasDeCuenta(int $cuentaId): array
     {

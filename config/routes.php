@@ -79,6 +79,7 @@ return function (Router $router): void {
     $router->get('/admin/clientes', [AdminClienteController::class, 'listar'], $admin);
     $router->get('/admin/clientes/nuevo', [AdminClienteController::class, 'mostrarNuevo'], $admin);
     $router->post('/admin/clientes', [AdminClienteController::class, 'crear'], $adminCsrf);
+    $router->get('/admin/clientes/actividad-campanias', [AdminClienteController::class, 'actividadCampanias'], $admin);
     $router->get('/admin/clientes/{id}', [AdminClienteController::class, 'detalle'], $admin);
     $router->post('/admin/clientes/{id}/asignar', [AdminClienteController::class, 'asignarCampanias'], $adminCsrf);
     $router->post('/admin/clientes/{id}/editar', [AdminClienteController::class, 'actualizarDatos'], $adminCsrf);

@@ -138,6 +138,8 @@ final class ClienteController
             'google_ads_ids_asignadas' => $googleAds->idsAsignadas($id),
             'ga4_propiedades' => $analytics->listarPropiedades(),
             'ga4_ids_asignadas' => $analytics->idsAsignadas($id),
+            'rango_desde_default' => date('Y-m-01', strtotime('-2 months')),
+            'rango_hasta_default' => date('Y-m-d'),
             'success' => $session->getFlash('success'),
             'error' => $session->getFlash('error'),
         ]));
@@ -175,6 +177,26 @@ final class ClienteController
         $session->flash('success', count($ids) . ' campaña(s) asignada(s) al cliente.');
 
         return Response::redirect('/admin/clientes/' . $clienteId);
+    }
+
+    /**
+     * JSON con el gasto y los resultados importados de cada campaña (Meta y
+     * Google Ads) en un rango. Lo usa la ficha del cliente para filtrar la
+     * asignación por fecha sin recargar la página.
+     */
+    public function actividadCampanias(Request $request): Response
+    {
+        $desde = (string) $request->input('desde', '');
+        $hasta = (string) $request->input('hasta', '');
+        $esFecha = static fn (string $f): bool => (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $f);
+        if (!$esFecha($desde) || !$esFecha($hasta) || $desde > $hasta) {
+            return Response::json(['error' => 'Rango de fechas inválido.'], 400);
+        }
+
+        return Response::json([
+            'meta' => (object) $this->container->get(EntidadesMetaRepository::class)->actividadCampanias($desde, $hasta),
+            'google_ads' => (object) $this->container->get(GoogleAdsRepository::class)->actividadCampanias($desde, $hasta),
+        ]);
     }
 
     /** Reemplaza el set de campañas de Google Ads asignadas al cliente. */

@@ -156,9 +156,18 @@ $ga4Set = array_flip($ga4_ids_asignadas);
         <?php if ($cuentas_con_campanias === []): ?>
             <p class="muted">No hay cuentas publicitarias importadas. <a href="<?= $view->url('/admin/meta') ?>">Conectá Meta</a> e <a href="<?= $view->url('/admin/importar') ?>">importá una cuenta</a> primero.</p>
         <?php else: ?>
-            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/asignar') ?>" data-filtro-campanias>
+            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/asignar') ?>" data-filtro-campanias data-fuente="meta">
                 <?= $view->csrfField() ?>
                 <div class="filtro-campanias">
+                    <div class="filtro-campanias__rango">
+                        <label class="filtro-campanias__check">
+                            <input type="checkbox" data-solo-gasto>
+                            <span>Solo campañas con gasto entre</span>
+                        </label>
+                        <input type="date" class="field__input" data-rango-desde value="<?= $view->e($rango_desde_default) ?>" aria-label="Desde">
+                        <span>y</span>
+                        <input type="date" class="field__input" data-rango-hasta value="<?= $view->e($rango_hasta_default) ?>" aria-label="Hasta">
+                    </div>
                     <input type="search" class="field__input" data-filtro-input autocomplete="off"
                            placeholder="Filtrar campañas por nombre… (ej. Costa Marfil 2026)" aria-label="Filtrar campañas por nombre">
                     <small class="muted" data-filtro-info></small>
@@ -177,8 +186,8 @@ $ga4Set = array_flip($ga4_ids_asignadas);
                         <div class="campania-select-actions">
                             <button type="button" class="btn btn--link" data-toggle-all="<?= (int) $cuenta['id'] ?>">Marcar todas</button>
                         </div>
-                        <table class="table" data-cuenta="<?= (int) $cuenta['id'] ?>">
-                            <thead><tr><th style="width:50px"></th><th>Campaña</th><th>Objetivo</th><th>Estado</th></tr></thead>
+                        <table class="table" data-cuenta="<?= (int) $cuenta['id'] ?>" data-moneda="<?= $view->e((string) ($cuenta['moneda'] ?? '')) ?>">
+                            <thead><tr><th style="width:50px"></th><th>Campaña</th><th>Objetivo</th><th>Estado</th><th class="num">En el rango</th></tr></thead>
                             <tbody>
                             <?php foreach ($campanias as $c): ?>
                                 <tr>
@@ -189,6 +198,7 @@ $ga4Set = array_flip($ga4_ids_asignadas);
                                     <td><?= $view->e((string) $c['nombre']) ?></td>
                                     <td><?= $view->e((string) ($c['objetivo'] ?? '—')) ?></td>
                                     <td><?= $view->e((string) ($c['estado'] ?? '—')) ?></td>
+                                    <td class="num muted" data-actividad></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -210,9 +220,18 @@ $ga4Set = array_flip($ga4_ids_asignadas);
         <?php if ($google_ads_cuentas === []): ?>
             <p class="muted">No hay cuentas de Google Ads sincronizadas. <a href="<?= $view->url('/admin/google') ?>">Conectá Google</a> e importá una cuenta primero.</p>
         <?php else: ?>
-            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/asignar-google-ads') ?>" data-filtro-campanias>
+            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/asignar-google-ads') ?>" data-filtro-campanias data-fuente="google_ads">
                 <?= $view->csrfField() ?>
                 <div class="filtro-campanias">
+                    <div class="filtro-campanias__rango">
+                        <label class="filtro-campanias__check">
+                            <input type="checkbox" data-solo-gasto>
+                            <span>Solo campañas con gasto entre</span>
+                        </label>
+                        <input type="date" class="field__input" data-rango-desde value="<?= $view->e($rango_desde_default) ?>" aria-label="Desde">
+                        <span>y</span>
+                        <input type="date" class="field__input" data-rango-hasta value="<?= $view->e($rango_hasta_default) ?>" aria-label="Hasta">
+                    </div>
                     <input type="search" class="field__input" data-filtro-input autocomplete="off"
                            placeholder="Filtrar campañas por nombre… (ej. Costa Marfil 2026)" aria-label="Filtrar campañas por nombre">
                     <small class="muted" data-filtro-info></small>
@@ -229,8 +248,8 @@ $ga4Set = array_flip($ga4_ids_asignadas);
                         <div class="campania-select-actions">
                             <button type="button" class="btn btn--link" data-toggle-all="gads-<?= (int) $cuenta['id'] ?>">Marcar todas</button>
                         </div>
-                        <table class="table" data-cuenta="gads-<?= (int) $cuenta['id'] ?>">
-                            <thead><tr><th style="width:50px"></th><th>Campaña</th><th>Tipo</th><th>Estado</th></tr></thead>
+                        <table class="table" data-cuenta="gads-<?= (int) $cuenta['id'] ?>" data-moneda="<?= $view->e((string) ($cuenta['moneda'] ?? '')) ?>">
+                            <thead><tr><th style="width:50px"></th><th>Campaña</th><th>Tipo</th><th>Estado</th><th class="num">En el rango</th></tr></thead>
                             <tbody>
                             <?php foreach ($bloque['campanias'] as $c): ?>
                                 <tr>
@@ -238,6 +257,7 @@ $ga4Set = array_flip($ga4_ids_asignadas);
                                     <td><?= $view->e((string) $c['nombre']) ?></td>
                                     <td><?= $view->e(\MisterCo\Reports\Domain\EtiquetasGoogle::tipoCampania($c['tipo_canal'])) ?></td>
                                     <td><?= $view->e(\MisterCo\Reports\Domain\EtiquetasGoogle::estadoCampania($c['estado'])) ?></td>
+                                    <td class="num muted" data-actividad></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -297,26 +317,83 @@ document.querySelectorAll('[data-toggle-all]').forEach(btn => {
     });
 });
 
-// Filtro por nombre: cada palabra tiene que aparecer en el nombre, en cualquier orden.
-// Las campañas ocultas conservan su marca y se guardan igual al enviar.
+// Filtro por nombre (cada palabra tiene que aparecer, en cualquier orden) y, opcionalmente,
+// por gasto en un rango de fechas según los datos importados. Las campañas ocultas
+// conservan su marca y se guardan igual al enviar.
+const urlActividad = <?= json_encode($view->url('/admin/clientes/actividad-campanias')) ?>;
+const cacheActividad = {};
+async function actividadEnRango(desde, hasta) {
+    const clave = desde + '|' + hasta;
+    if (!cacheActividad[clave]) {
+        const resp = await fetch(urlActividad + '?' + new URLSearchParams({ desde, hasta }), { headers: { 'Accept': 'application/json' } });
+        const data = await resp.json();
+        if (!resp.ok || data.error) throw new Error(data.error || 'No se pudo consultar la actividad.');
+        cacheActividad[clave] = data;
+    }
+    return cacheActividad[clave];
+}
+
 document.querySelectorAll('form[data-filtro-campanias]').forEach(form => {
+    const fuente = form.dataset.fuente;
+    const etiquetaResultados = fuente === 'google_ads' ? 'conversiones' : 'resultados';
     const input = form.querySelector('[data-filtro-input]');
     const info = form.querySelector('[data-filtro-info]');
+    const soloGasto = form.querySelector('[data-solo-gasto]');
+    const desde = form.querySelector('[data-rango-desde]');
+    const hasta = form.querySelector('[data-rango-hasta]');
     const filas = [...form.querySelectorAll('table[data-cuenta] tbody tr')];
     filas.forEach(tr => tr.dataset.nombre = normalizar(tr.cells[1].textContent));
+    let actividad = null; // { idCampania: {gasto, resultados} } cuando el filtro de gasto está activo
+    let aviso = '';
+    let consulta = 0; // solo la última consulta pisa el resultado (cambios rápidos de fecha)
 
-    input.addEventListener('keydown', ev => { if (ev.key === 'Enter') ev.preventDefault(); });
-    input.addEventListener('input', () => {
+    const formatear = (tr, a) => {
+        const moneda = tr.closest('table').dataset.moneda;
+        const gasto = Number(a.gasto).toLocaleString('es-PY', { maximumFractionDigits: moneda === 'PYG' ? 0 : 2 });
+        const res = Number(a.resultados).toLocaleString('es-PY', { maximumFractionDigits: 2 });
+        return `${moneda} ${gasto} · ${res} ${etiquetaResultados}`;
+    };
+
+    const aplicar = () => {
         const palabras = normalizar(input.value).split(/\s+/).filter(Boolean);
         filas.forEach(tr => {
-            tr.style.display = palabras.every(p => tr.dataset.nombre.includes(p)) ? '' : 'none';
+            const a = actividad ? actividad[tr.querySelector('input[type="checkbox"]').value] : null;
+            tr.querySelector('[data-actividad]').textContent = a ? formatear(tr, a) : '';
+            const pasaNombre = palabras.every(p => tr.dataset.nombre.includes(p));
+            tr.style.display = pasaNombre && (actividad === null || a) ? '' : 'none';
         });
         form.querySelectorAll('fieldset').forEach(fs => {
             fs.style.display = [...fs.querySelectorAll('tbody tr')].some(filaVisible) ? '' : 'none';
         });
         const visibles = filas.filter(filaVisible).length;
-        info.textContent = palabras.length === 0 ? ''
-            : (visibles === 0 ? 'Ninguna campaña coincide con el filtro.' : `${visibles} de ${filas.length} campañas coinciden.`);
-    });
+        const filtrando = palabras.length > 0 || actividad !== null;
+        info.textContent = aviso || (!filtrando ? ''
+            : (visibles === 0 ? 'Ninguna campaña coincide con el filtro.' : `${visibles} de ${filas.length} campañas coinciden.`));
+    };
+
+    const recargarActividad = async () => {
+        aviso = '';
+        if (!soloGasto.checked) { actividad = null; aplicar(); return; }
+        if (!desde.value || !hasta.value || desde.value > hasta.value) {
+            actividad = null; aviso = 'Elegí un rango de fechas válido.'; aplicar(); return;
+        }
+        info.textContent = 'Buscando campañas con gasto…';
+        const esta = ++consulta;
+        let resultado = null;
+        try {
+            resultado = (await actividadEnRango(desde.value, hasta.value))[fuente] || {};
+        } catch (e) {
+            if (esta === consulta) aviso = e.message;
+        }
+        if (esta !== consulta) return;
+        actividad = resultado;
+        aplicar();
+    };
+
+    input.addEventListener('keydown', ev => { if (ev.key === 'Enter') ev.preventDefault(); });
+    input.addEventListener('input', aplicar);
+    soloGasto.addEventListener('change', recargarActividad);
+    desde.addEventListener('change', recargarActividad);
+    hasta.addEventListener('change', recargarActividad);
 });
 </script>
