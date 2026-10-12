@@ -161,6 +161,7 @@ final class GoogleReporteController
                 'es_admin' => $esAdmin,
                 'asignado' => $asignado,
                 'base' => ($esAdmin ? '/admin/clientes/' . $clienteId : '/cliente') . '/' . self::FUENTES[$fuente]['ruta'],
+                'fuentes' => $this->container->get(ClienteRepository::class)->fuentesAsignadas($clienteId),
             ],
         ];
     }

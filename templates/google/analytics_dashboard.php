@@ -30,6 +30,9 @@ $nPropiedades = count($propiedades_asignadas);
 ]) ?>
 
 <section class="shell__body">
+    <?= $view->renderPartial('partials/pestanas_dashboard', ['es_admin' => $es_admin, 'cliente_id' => (int) $cliente['id'], 'fuentes' => $fuentes,
+        'activa' => 'analytics', 'periodo' => $periodo ?? null,
+    ]) ?>
     <div class="header-row">
         <div>
             <h1>Google Analytics</h1>

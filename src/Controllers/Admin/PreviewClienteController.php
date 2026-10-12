@@ -70,6 +70,7 @@ final class PreviewClienteController
             'usuario' => $request->attributes['usuario'],
             'titulo' => 'Vista previa · ' . $cliente['nombre_comercial'],
             'cliente' => $cliente,
+            'fuentes' => $this->container->get(ClienteRepository::class)->fuentesAsignadas($clienteId),
             'campanias_asignadas_count' => count($campaniasAsignadas),
             'moneda' => $moneda,
             'desde' => $desde,

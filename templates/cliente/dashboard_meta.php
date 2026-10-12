@@ -34,6 +34,9 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
 <?= $view->renderPartial('partials/cliente_header', ['usuario' => $usuario]) ?>
 
 <section class="shell__body">
+    <?= $view->renderPartial('partials/pestanas_dashboard', ['es_admin' => false, 'cliente_id' => 0, 'fuentes' => $fuentes_cliente,
+        'activa' => 'meta', 'periodo' => $periodo ?? null,
+    ]) ?>
     <div class="header-row">
         <div>
             <h1>Mi dashboard</h1>

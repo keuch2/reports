@@ -460,3 +460,10 @@ details pre {
 .filtro-campanias__rango { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .filtro-campanias__rango .field__input { width: auto; }
 .filtro-campanias__check { display: flex; gap: 0.4rem; align-items: center; cursor: pointer; margin: 0; }
+
+/* Pestañas del dashboard (Meta Ads | Google Ads | Google Analytics) */
+.tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1.25rem; }
+.tabs__item { padding: 0.6rem 1rem; color: var(--color-muted); text-decoration: none; font-weight: 600; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+.tabs__item:hover { color: var(--color-text); }
+.tabs__item--activa { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+.tabs__item--vacia { opacity: 0.55; }
