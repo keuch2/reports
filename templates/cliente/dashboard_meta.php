@@ -39,6 +39,7 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
             <h1>Mi dashboard</h1>
             <p class="muted"><?= $campanias_asignadas_count ?> campaña<?= $campanias_asignadas_count === 1 ? '' : 's' ?> asignada<?= $campanias_asignadas_count === 1 ? '' : 's' ?></p>
         </div>
+        <a href="<?= $view->url('/cliente/comparar') ?>" class="btn btn--secondary">📊 Comparar campañas</a>
     </div>
 
     <?php if ($meses_disponibles === []): ?>

@@ -46,6 +46,9 @@ $valorWidget = static function (string $codigo) use ($totales, $fmtMoneda, $fmtN
             <h1>Mi dashboard <span class="muted" style="font-weight:normal;font-size:0.9rem">(como lo ve <?= $view->e((string) $cliente['nombre_comercial']) ?>)</span></h1>
             <p class="muted"><?= $campanias_asignadas_count ?> campaña<?= $campanias_asignadas_count === 1 ? '' : 's' ?> asignada<?= $campanias_asignadas_count === 1 ? '' : 's' ?></p>
         </div>
+        <?php if ($campanias_asignadas_count > 0): ?>
+            <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/comparar') ?>" class="btn btn--secondary">📊 Comparar campañas</a>
+        <?php endif; ?>
     </div>
 
     <?php if ($campanias_asignadas_count === 0): ?>

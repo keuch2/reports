@@ -9,14 +9,17 @@
  * @var bool $es_admin
  * @var string $seccion Sección activa del menú del cliente.
  * @var string $descripcion Texto del banner de preview.
+ * @var array{url:string, texto:string}|null $volver Destino del botón del banner (por defecto, la ficha del cliente).
  */
+
+$volver = $volver ?? ['url' => $view->url('/admin/clientes/' . ((int) $cliente['id'])), 'texto' => 'Volver al cliente'];
 ?>
 <?php if ($es_admin): ?>
     <?= $view->renderPartial('partials/admin_header', ['usuario' => $usuario, 'seccion' => 'clientes']) ?>
     <div class="preview-banner">
         <span>👁️ <?= $view->e($descripcion) ?> de <strong><?= $view->e((string) $cliente['nombre_comercial']) ?></strong>
             — exactamente lo que ve el cliente.</span>
-        <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id'])) ?>" class="btn btn--link">Volver al cliente</a>
+        <a href="<?= $view->e($volver['url']) ?>" class="btn btn--link"><?= $view->e($volver['texto']) ?></a>
     </div>
 <?php else: ?>
     <?= $view->renderPartial('partials/cliente_header', ['usuario' => $usuario, 'seccion' => $seccion]) ?>

@@ -19,9 +19,6 @@ $seccion = $seccion ?? 'meta';
         <?php if ($fuentes['analytics']): ?>
             <a href="<?= $view->url('/cliente/analytics') ?>" class="<?= $seccion === 'analytics' ? 'active' : '' ?>">Google Analytics</a>
         <?php endif; ?>
-        <?php if ($fuentes['meta'] || $fuentes['google_ads']): ?>
-            <a href="<?= $view->url('/cliente/comparar') ?>" class="<?= $seccion === 'comparar' ? 'active' : '' ?>">Comparar</a>
-        <?php endif; ?>
         <?php if ($fuentes['meta']): ?>
             <a href="<?= $view->url('/cliente/preferencias') ?>" class="<?= $seccion === 'preferencias' ? 'active' : '' ?>">Preferencias</a>
         <?php endif; ?>

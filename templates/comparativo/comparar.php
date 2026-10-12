@@ -30,13 +30,16 @@ $fmtValor = static function (?float $v, string $formato, string $moneda): string
 };
 $fmtVariacion = static fn (?float $v): string => $v === null ? '—' : ($v > 0 ? '+' : '') . number_format($v, 1, ',', '.') . '%';
 $fmtFecha = static fn (string $f): string => date('d/m/Y', strtotime($f));
+$urlDashboard = $view->url($es_admin ? '/admin/clientes/' . ((int) $cliente['id']) . '/dashboard' : '/cliente');
 ?>
 <?= $view->renderPartial('partials/encabezado_cliente', [
     'usuario' => $usuario, 'cliente' => $cliente, 'es_admin' => $es_admin,
     'seccion' => 'comparar', 'descripcion' => 'Comparativo de campañas',
+    'volver' => ['url' => $urlDashboard, 'texto' => 'Volver al dashboard'],
 ]) ?>
 
 <section class="shell__body">
+    <p><a href="<?= $view->e($urlDashboard) ?>">← Volver al dashboard</a></p>
     <h1>Comparar campañas</h1>
     <p class="muted">Elegí una campaña y un rango de fechas para cada lado. Podés comparar la misma campaña en dos períodos o dos campañas distintas.</p>
 
