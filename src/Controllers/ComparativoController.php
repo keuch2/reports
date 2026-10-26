@@ -17,7 +17,7 @@ use MisterCo\Reports\Services\ReportePdfService;
 /**
  * Reporte comparativo: dos campañas (o la misma) en dos rangos de fechas.
  * Sirve al cliente (/cliente/comparar) y a la vista previa del admin
- * (/admin/clientes/{id}/comparar), igual que GoogleReporteController.
+ * (/admin/clientes/{id}/comparar), igual que ReporteFuenteController.
  */
 final class ComparativoController
 {

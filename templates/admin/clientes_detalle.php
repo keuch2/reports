@@ -10,12 +10,17 @@
 /** @var list<int> $google_ads_ids_asignadas */
 /** @var list<array<string,mixed>> $ga4_propiedades */
 /** @var list<int> $ga4_ids_asignadas */
+/** @var list<array<string,mixed>> $redes_paginas */
+/** @var list<int> $redes_paginas_asignadas */
+/** @var list<int> $redes_instagram_asignadas */
 /** @var string|null $success */
 /** @var string|null $error */
 
 $asignadasSet = array_flip($ids_asignadas);
 $googleAdsSet = array_flip($google_ads_ids_asignadas);
 $ga4Set = array_flip($ga4_ids_asignadas);
+$paginasSet = array_flip($redes_paginas_asignadas);
+$instagramSet = array_flip($redes_instagram_asignadas);
 ?>
 <?= $view->renderPartial('partials/admin_header', ['usuario' => $usuario, 'seccion' => 'clientes']) ?>
 
@@ -39,6 +44,9 @@ $ga4Set = array_flip($ga4_ids_asignadas);
             <?php endif; ?>
             <?php if ($ga4_ids_asignadas !== []): ?>
                 <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/analytics') ?>" class="btn btn--secondary">Analytics</a>
+            <?php endif; ?>
+            <?php if ($redes_paginas_asignadas !== [] || $redes_instagram_asignadas !== []): ?>
+                <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/redes') ?>" class="btn btn--secondary">Facebook e Instagram</a>
             <?php endif; ?>
             <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/permisos') ?>" class="btn btn--link">
                 Permisos avanzados →
@@ -296,6 +304,49 @@ $ga4Set = array_flip($ga4_ids_asignadas);
                 </table>
                 <div class="form-actions" style="margin-top:1.5rem">
                     <button type="submit" class="btn btn--primary">Guardar propiedades de Analytics</button>
+                </div>
+            </form>
+        <?php endif; ?>
+    </article>
+
+    <article class="card" style="margin-top:1.5rem">
+        <h2>Facebook e Instagram (<?= count($redes_paginas_asignadas) + count($redes_instagram_asignadas) ?> asignadas)</h2>
+        <p class="muted">Marcá las páginas de Facebook y cuentas de Instagram cuyas analíticas podrá ver el cliente.</p>
+
+        <?php if ($redes_paginas === []): ?>
+            <p class="muted">No hay páginas sincronizadas. Sincronizalas desde <a href="<?= $view->url('/admin/meta') ?>">Cuenta Meta</a>.</p>
+        <?php else: ?>
+            <form method="POST" action="<?= $view->url('/admin/clientes/' . ((int) $cliente['id']) . '/asignar-redes') ?>">
+                <?= $view->csrfField() ?>
+                <table class="table">
+                    <thead><tr><th>Página de Facebook</th><th class="num">Seguidores</th><th>Instagram vinculado</th><th class="num">Seguidores</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($redes_paginas as $p): ?>
+                        <tr>
+                            <td>
+                                <label style="display:flex;gap:0.5rem;align-items:center;cursor:pointer">
+                                    <input type="checkbox" name="redes_paginas[]" value="<?= (int) $p['id'] ?>" <?= isset($paginasSet[(int) $p['id']]) ? 'checked' : '' ?>>
+                                    <?= $view->e((string) $p['nombre']) ?>
+                                </label>
+                            </td>
+                            <td class="num"><?= $p['seguidores'] !== null ? number_format((int) $p['seguidores'], 0, ',', '.') : '—' ?></td>
+                            <td>
+                                <?php if ($p['ig_id'] !== null): ?>
+                                    <label style="display:flex;gap:0.5rem;align-items:center;cursor:pointer">
+                                        <input type="checkbox" name="redes_instagram[]" value="<?= (int) $p['ig_id'] ?>" <?= isset($instagramSet[(int) $p['ig_id']]) ? 'checked' : '' ?>>
+                                        @<?= $view->e((string) $p['ig_username']) ?>
+                                    </label>
+                                <?php else: ?>
+                                    <span class="muted">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="num"><?= $p['ig_seguidores'] !== null ? number_format((int) $p['ig_seguidores'], 0, ',', '.') : '—' ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <div class="form-actions" style="margin-top:1.5rem">
+                    <button type="submit" class="btn btn--primary">Guardar Facebook e Instagram</button>
                 </div>
             </form>
         <?php endif; ?>

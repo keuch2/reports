@@ -14,6 +14,7 @@ final class ReportePdfService
         private readonly View $view,
         private readonly DashboardService $dashboard,
         private readonly GoogleReporteService $google,
+        private readonly RedesReporteService $redes,
         private readonly Database $db,
         private readonly string $storagePath,
     ) {
@@ -216,6 +217,23 @@ final class ReportePdfService
         bool $marcaDeAgua = false,
     ): array {
         return $this->generarConPlantilla('pdf/google_analytics', 'google_analytics', $this->google->datosAnalytics($clienteId, $desde, $hasta),
+            $clienteId, $desde, $hasta, $generadoPorUsuarioId, $comentarios, $marcaDeAgua);
+    }
+
+    /**
+     * PDF de Facebook e Instagram del cliente: mismos datos que su dashboard de redes.
+     *
+     * @return array{ruta:string, nombre:string, tamanio:int}
+     */
+    public function generarRedes(
+        int $clienteId,
+        string $desde,
+        string $hasta,
+        int $generadoPorUsuarioId,
+        ?string $comentarios = null,
+        bool $marcaDeAgua = false,
+    ): array {
+        return $this->generarConPlantilla('pdf/redes_sociales', 'redes', $this->redes->datos($clienteId, $desde, $hasta),
             $clienteId, $desde, $hasta, $generadoPorUsuarioId, $comentarios, $marcaDeAgua);
     }
 

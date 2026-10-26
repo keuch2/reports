@@ -1,6 +1,7 @@
 <?php
 /**
- * Pestañas del dashboard del cliente: Meta Ads | Google Ads | Google Analytics.
+ * Pestañas del dashboard del cliente: Meta Ads | Google Ads | Google Analytics |
+ * Facebook e Instagram.
  * Mantienen el período elegido al cambiar de pestaña.
  *
  * El cliente ve solo las fuentes que tiene asignadas (si es una sola, no hay
@@ -8,10 +9,10 @@
  * entrar muestran el aviso para asignarlas.
  *
  * @var \MisterCo\Reports\Core\View $view
- * @var string $activa 'meta' | 'google_ads' | 'analytics'
+ * @var string $activa 'meta' | 'google_ads' | 'analytics' | 'redes'
  * @var bool $es_admin
  * @var int $cliente_id
- * @var array{meta: bool, google_ads: bool, analytics: bool} $fuentes
+ * @var array{meta: bool, google_ads: bool, analytics: bool, redes: bool} $fuentes
  * @var \MisterCo\Reports\Domain\PeriodoReporte|null $periodo
  */
 
@@ -20,6 +21,7 @@ $pestanas = [
     'meta' => ['Meta Ads', $es_admin ? $base . '/dashboard' : $base],
     'google_ads' => ['Google Ads', $base . '/google-ads'],
     'analytics' => ['Google Analytics', $base . '/analytics'],
+    'redes' => ['Facebook e Instagram', $base . '/redes'],
 ];
 if (!$es_admin) {
     $pestanas = array_filter($pestanas, static fn (string $clave): bool => $fuentes[$clave], ARRAY_FILTER_USE_KEY);

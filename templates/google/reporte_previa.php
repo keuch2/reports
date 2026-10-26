@@ -5,6 +5,7 @@
 /** @var bool $es_admin */
 /** @var string $base */
 /** @var string $nombre_fuente */
+/** @var string $seccion */
 /** @var list<string> $meses_disponibles */
 /** @var \MisterCo\Reports\Domain\PeriodoReporte $periodo */
 
@@ -12,7 +13,7 @@ $volver = $view->url($base) . '?' . $periodo->query();
 ?>
 <?= $view->renderPartial('partials/encabezado_cliente', [
     'usuario' => $usuario, 'cliente' => $cliente, 'es_admin' => $es_admin,
-    'seccion' => str_contains($base, 'google-ads') ? 'google_ads' : 'analytics',
+    'seccion' => $seccion,
     'descripcion' => 'Reporte PDF de ' . $nombre_fuente,
 ]) ?>
 

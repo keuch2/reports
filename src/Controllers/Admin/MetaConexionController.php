@@ -11,10 +11,12 @@ use MisterCo\Reports\Core\Session;
 use MisterCo\Reports\Core\View;
 use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\CuentaPublicitariaRepository;
+use MisterCo\Reports\Repositories\RedesSocialesRepository;
 use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\Meta\MetaApiException;
 use MisterCo\Reports\Services\Meta\MetaOAuthService;
 use MisterCo\Reports\Services\Meta\MetaTokenService;
+use MisterCo\Reports\Services\Meta\RedesSocialesService;
 
 final class MetaConexionController
 {
@@ -41,6 +43,7 @@ final class MetaConexionController
             'vence_en' => $tokenService->venceEn(),
             'dias_vencimiento' => $tokenService->diasHastaVencimiento(),
             'cuentas' => $cuentasRepo->listarTodas(),
+            'paginas' => $this->container->get(RedesSocialesRepository::class)->listarPaginas(),
             'error' => $session->getFlash('error'),
             'success' => $session->getFlash('success'),
         ]));
@@ -122,7 +125,7 @@ final class MetaConexionController
         $importadas = $this->sincronizarCuentas($cuentasMeta);
 
         $vence = $expiraEn !== null ? ' El acceso vence el ' . $expiraEn->format('d/m/Y') . '.' : '';
-        $session->flash('success', "Cuenta conectada con Facebook. Se sincronizaron {$importadas} cuentas publicitarias.{$vence}");
+        $session->flash('success', "Cuenta conectada con Facebook. Se sincronizaron {$importadas} cuentas publicitarias{$this->sincronizarRedes()}.{$vence}");
 
         return Response::redirect('/admin/meta');
     }
@@ -159,7 +162,7 @@ final class MetaConexionController
 
         $importadas = $this->sincronizarCuentas($cuentasMeta);
 
-        $session->flash('success', "Token válido. Se sincronizaron {$importadas} cuentas publicitarias.");
+        $session->flash('success', "Token válido. Se sincronizaron {$importadas} cuentas publicitarias{$this->sincronizarRedes()}.");
 
         return Response::redirect('/admin/meta');
     }
@@ -175,6 +178,21 @@ final class MetaConexionController
         $this->container->get(Session::class)->flash('success', 'Token de Meta eliminado.');
 
         return Response::redirect('/admin/meta');
+    }
+
+    /**
+     * Sincroniza también las páginas de Facebook e Instagram. Si el token no
+     * tiene esos permisos no se corta la conexión: se avisa en el mensaje.
+     */
+    private function sincronizarRedes(): string
+    {
+        try {
+            $r = $this->container->get(RedesSocialesService::class)->sincronizar();
+
+            return ", {$r['paginas']} páginas de Facebook y {$r['instagram']} cuentas de Instagram";
+        } catch (MetaApiException $e) {
+            return ' (las páginas de Facebook e Instagram no se pudieron sincronizar: ' . $e->getMessage() . ')';
+        }
     }
 
     /**

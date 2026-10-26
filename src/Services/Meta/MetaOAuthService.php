@@ -19,8 +19,11 @@ final class MetaOAuthService
     private const GRAPH_URI = 'https://graph.facebook.com';
     private const DIALOG_URI = 'https://www.facebook.com';
 
-    /** Permisos mínimos para leer campañas + insights de las cuentas del negocio. */
-    private const SCOPES = 'ads_read,business_management';
+    /**
+     * Permisos mínimos de solo lectura: campañas + insights de anuncios, y
+     * analíticas orgánicas de páginas de Facebook y cuentas de Instagram.
+     */
+    private const SCOPES = 'ads_read,business_management,pages_show_list,pages_read_engagement,read_insights,instagram_basic,instagram_manage_insights';
 
     public function __construct(
         private readonly string $appId,

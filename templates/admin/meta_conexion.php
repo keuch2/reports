@@ -7,6 +7,7 @@
 /** @var \DateTimeImmutable|null $vence_en */
 /** @var int|null $dias_vencimiento */
 /** @var list<array<string,mixed>> $cuentas */
+/** @var list<array<string,mixed>> $paginas */
 /** @var string|null $error */
 /** @var string|null $success */
 ?>
@@ -57,7 +58,8 @@
             </p>
             <p class="muted" style="font-size:0.85rem">
                 Se abrirá Facebook para autorizar el acceso de solo lectura a tus campañas
-                (<code>ads_read</code>, <code>business_management</code>). El acceso dura ~60 días
+                y a las analíticas de tus páginas e Instagram (<code>ads_read</code>, <code>business_management</code>,
+                <code>pages_read_engagement</code>, <code>read_insights</code>, <code>instagram_manage_insights</code>). El acceso dura ~60 días
                 y podés renovarlo con un click desde acá.
             </p>
         <?php else: ?>
@@ -86,7 +88,9 @@
             <p class="muted" style="margin-top:0.75rem;font-size:0.85rem">
                 Alternativa técnica: generá un token de System User en el Business Manager
                 (Configuración del negocio → Usuarios → Usuarios del sistema) con permisos
-                <code>ads_read</code> y <code>business_management</code>, y pegalo acá.
+                <code>ads_read</code> y <code>business_management</code> (y para analíticas de páginas e Instagram:
+                <code>pages_show_list</code>, <code>pages_read_engagement</code>, <code>read_insights</code>,
+                <code>instagram_basic</code>, <code>instagram_manage_insights</code>), y pegalo acá.
                 A diferencia de la conexión con Facebook, este token <strong>no vence</strong>.
             </p>
             <form method="POST" action="<?= $view->url('/admin/meta/conectar') ?>" class="form-stack" style="margin-top:0.5rem">
@@ -123,6 +127,38 @@
                         <td><?= $view->e((string) ($c['moneda'] ?? '—')) ?></td>
                         <td><?= $view->e((string) ($c['estado'] ?? '—')) ?></td>
                         <td><?= $view->e((string) ($c['ultima_sincronizacion_en'] ?? '—')) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+    </article>
+    <article class="card" style="margin-top:1.5rem">
+        <div class="header-row">
+            <h2 style="margin:0">Páginas de Facebook e Instagram (<?= count($paginas) ?>)</h2>
+            <?php if ($tiene_token): ?>
+                <form method="POST" action="<?= $view->url('/admin/meta/redes/sincronizar') ?>">
+                    <?= $view->csrfField() ?>
+                    <button type="submit" class="btn btn--secondary">Sincronizar páginas</button>
+                </form>
+            <?php endif; ?>
+        </div>
+        <p class="muted">Para analíticas orgánicas (seguidores, alcance, interacciones, publicaciones). Se importan desde
+            <a href="<?= $view->url('/admin/importar') ?>">Importar</a> y se asignan a cada cliente desde su ficha.</p>
+        <?php if ($paginas === []): ?>
+            <p class="muted">Sin páginas sincronizadas. Si recién se agregaron los permisos de páginas e Instagram,
+                reconectá con Facebook y volvé a sincronizar.</p>
+        <?php else: ?>
+            <table class="table">
+                <thead><tr><th>Página</th><th>Categoría</th><th class="num">Seguidores</th><th>Instagram vinculado</th><th class="num">Seguidores IG</th></tr></thead>
+                <tbody>
+                <?php foreach ($paginas as $p): ?>
+                    <tr>
+                        <td><?= $view->e((string) $p['nombre']) ?></td>
+                        <td><?= $view->e((string) ($p['categoria'] ?? '—')) ?></td>
+                        <td class="num"><?= $p['seguidores'] !== null ? number_format((int) $p['seguidores'], 0, ',', '.') : '—' ?></td>
+                        <td><?= $p['ig_username'] !== null ? '@' . $view->e((string) $p['ig_username']) : '<span class="muted">—</span>' ?></td>
+                        <td class="num"><?= $p['ig_seguidores'] !== null ? number_format((int) $p['ig_seguidores'], 0, ',', '.') : '—' ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

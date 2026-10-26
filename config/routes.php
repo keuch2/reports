@@ -12,6 +12,7 @@ use MisterCo\Reports\Controllers\Admin\MetaConexionController;
 use MisterCo\Reports\Controllers\Admin\PermisosController;
 use MisterCo\Reports\Controllers\Admin\PlantillaPdfController;
 use MisterCo\Reports\Controllers\Admin\PreviewClienteController;
+use MisterCo\Reports\Controllers\Admin\RedesSocialesController;
 use MisterCo\Reports\Controllers\Admin\ReporteClienteController;
 use MisterCo\Reports\Controllers\Admin\UsuarioAdminController;
 use MisterCo\Reports\Controllers\AuthController;
@@ -21,9 +22,9 @@ use MisterCo\Reports\Controllers\Cliente\DashboardController as ClienteDashboard
 use MisterCo\Reports\Controllers\Cliente\PreferenciasController as ClientePreferenciasController;
 use MisterCo\Reports\Controllers\Cliente\ReporteController as ClienteReporteController;
 use MisterCo\Reports\Controllers\ComparativoController;
-use MisterCo\Reports\Controllers\GoogleReporteController;
 use MisterCo\Reports\Controllers\HomeController;
 use MisterCo\Reports\Controllers\PasswordResetController;
+use MisterCo\Reports\Controllers\ReporteFuenteController;
 use MisterCo\Reports\Core\Router;
 use MisterCo\Reports\Middleware\AdminMiddleware;
 use MisterCo\Reports\Middleware\AuthMiddleware;
@@ -63,6 +64,7 @@ return function (Router $router): void {
     $router->get('/admin/meta/oauth/callback', [MetaConexionController::class, 'oauthCallback'], $admin);
     $router->post('/admin/meta/conectar', [MetaConexionController::class, 'conectar'], $adminCsrf);
     $router->post('/admin/meta/desconectar', [MetaConexionController::class, 'desconectar'], $adminCsrf);
+    $router->post('/admin/meta/redes/sincronizar', [RedesSocialesController::class, 'sincronizar'], $adminCsrf);
 
     // Google Ads + Google Analytics: conexión OAuth, sincronización e importación.
     $router->get('/admin/google', [GoogleConexionController::class, 'mostrar'], $admin);
@@ -75,6 +77,7 @@ return function (Router $router): void {
     $router->get('/admin/importar', [ImportacionController::class, 'mostrar'], $admin);
     $router->get('/admin/importar/campanias', [ImportacionController::class, 'campaniasEnVivo'], $admin);
     $router->post('/admin/importar', [ImportacionController::class, 'ejecutar'], $adminCsrf);
+    $router->post('/admin/importar/redes', [RedesSocialesController::class, 'importar'], $adminCsrf);
 
     $router->get('/admin/clientes', [AdminClienteController::class, 'listar'], $admin);
     $router->get('/admin/clientes/nuevo', [AdminClienteController::class, 'mostrarNuevo'], $admin);
@@ -87,6 +90,7 @@ return function (Router $router): void {
     $router->post('/admin/clientes/{id}/password', [AdminClienteController::class, 'cambiarPassword'], $adminCsrf);
     $router->post('/admin/clientes/{id}/asignar-google-ads', [AdminClienteController::class, 'asignarGoogleAds'], $adminCsrf);
     $router->post('/admin/clientes/{id}/asignar-analytics', [AdminClienteController::class, 'asignarAnalytics'], $adminCsrf);
+    $router->post('/admin/clientes/{id}/asignar-redes', [AdminClienteController::class, 'asignarRedes'], $adminCsrf);
 
     // Preview del dashboard del cliente desde sesión admin (mismos filtros y PDF que el cliente)
     $router->get('/admin/clientes/{id}/dashboard', [PreviewClienteController::class, 'dashboard'], $admin);
@@ -96,12 +100,15 @@ return function (Router $router): void {
     $router->post('/admin/clientes/{id}/campanias/{cid}/reporte.pdf', [ReporteClienteController::class, 'descargarCampania'], $adminCsrf);
 
     // Preview de Google Ads / Analytics del cliente (mismo controlador que el cliente)
-    $router->get('/admin/clientes/{id}/google-ads', [GoogleReporteController::class, 'adsDashboard'], $admin);
-    $router->get('/admin/clientes/{id}/google-ads/reporte', [GoogleReporteController::class, 'adsPrevia'], $admin);
-    $router->post('/admin/clientes/{id}/google-ads/reporte.pdf', [GoogleReporteController::class, 'adsPdf'], $adminCsrf);
-    $router->get('/admin/clientes/{id}/analytics', [GoogleReporteController::class, 'analyticsDashboard'], $admin);
-    $router->get('/admin/clientes/{id}/analytics/reporte', [GoogleReporteController::class, 'analyticsPrevia'], $admin);
-    $router->post('/admin/clientes/{id}/analytics/reporte.pdf', [GoogleReporteController::class, 'analyticsPdf'], $adminCsrf);
+    $router->get('/admin/clientes/{id}/google-ads', [ReporteFuenteController::class, 'adsDashboard'], $admin);
+    $router->get('/admin/clientes/{id}/google-ads/reporte', [ReporteFuenteController::class, 'adsPrevia'], $admin);
+    $router->post('/admin/clientes/{id}/google-ads/reporte.pdf', [ReporteFuenteController::class, 'adsPdf'], $adminCsrf);
+    $router->get('/admin/clientes/{id}/analytics', [ReporteFuenteController::class, 'analyticsDashboard'], $admin);
+    $router->get('/admin/clientes/{id}/analytics/reporte', [ReporteFuenteController::class, 'analyticsPrevia'], $admin);
+    $router->post('/admin/clientes/{id}/analytics/reporte.pdf', [ReporteFuenteController::class, 'analyticsPdf'], $adminCsrf);
+    $router->get('/admin/clientes/{id}/redes', [ReporteFuenteController::class, 'redesDashboard'], $admin);
+    $router->get('/admin/clientes/{id}/redes/reporte', [ReporteFuenteController::class, 'redesPrevia'], $admin);
+    $router->post('/admin/clientes/{id}/redes/reporte.pdf', [ReporteFuenteController::class, 'redesPdf'], $adminCsrf);
 
     // Comparativo de campañas del cliente (mismo controlador que el cliente)
     $router->get('/admin/clientes/{id}/comparar', [ComparativoController::class, 'mostrar'], $admin);
@@ -153,10 +160,13 @@ return function (Router $router): void {
     $router->get('/cliente/comparar', [ComparativoController::class, 'mostrar'], $cliente);
     $router->post('/cliente/comparar/reporte.pdf', [ComparativoController::class, 'pdf'], $clienteCsrf);
 
-    $router->get('/cliente/google-ads', [GoogleReporteController::class, 'adsDashboard'], $cliente);
-    $router->get('/cliente/google-ads/reporte', [GoogleReporteController::class, 'adsPrevia'], $cliente);
-    $router->post('/cliente/google-ads/reporte.pdf', [GoogleReporteController::class, 'adsPdf'], $clienteCsrf);
-    $router->get('/cliente/analytics', [GoogleReporteController::class, 'analyticsDashboard'], $cliente);
-    $router->get('/cliente/analytics/reporte', [GoogleReporteController::class, 'analyticsPrevia'], $cliente);
-    $router->post('/cliente/analytics/reporte.pdf', [GoogleReporteController::class, 'analyticsPdf'], $clienteCsrf);
+    $router->get('/cliente/google-ads', [ReporteFuenteController::class, 'adsDashboard'], $cliente);
+    $router->get('/cliente/google-ads/reporte', [ReporteFuenteController::class, 'adsPrevia'], $cliente);
+    $router->post('/cliente/google-ads/reporte.pdf', [ReporteFuenteController::class, 'adsPdf'], $clienteCsrf);
+    $router->get('/cliente/analytics', [ReporteFuenteController::class, 'analyticsDashboard'], $cliente);
+    $router->get('/cliente/analytics/reporte', [ReporteFuenteController::class, 'analyticsPrevia'], $cliente);
+    $router->post('/cliente/analytics/reporte.pdf', [ReporteFuenteController::class, 'analyticsPdf'], $clienteCsrf);
+    $router->get('/cliente/redes', [ReporteFuenteController::class, 'redesDashboard'], $cliente);
+    $router->get('/cliente/redes/reporte', [ReporteFuenteController::class, 'redesPrevia'], $cliente);
+    $router->post('/cliente/redes/reporte.pdf', [ReporteFuenteController::class, 'redesPdf'], $clienteCsrf);
 };

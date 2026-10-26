@@ -79,21 +79,23 @@ final class MetaTokenService
         $this->config->delete(self::CLAVE_VENCIMIENTO);
     }
 
-    public function cliente(): MetaApiClient
+    /** @param string|null $apiVersion Versión de Graph API; null = la configurada (META_API_VERSION). */
+    public function cliente(?string $apiVersion = null): MetaApiClient
     {
         $token = $this->obtenerToken();
         if ($token === null) {
             throw new MetaApiException('No hay token de Meta configurado. Conectá la cuenta primero.');
         }
 
-        return new MetaApiClient($token, $this->apiVersion);
+        return new MetaApiClient($token, $apiVersion ?? $this->apiVersion);
     }
 
     /**
-     * Construye un cliente con un token arbitrario (para validar antes de guardar).
+     * Construye un cliente con un token arbitrario (para validar antes de
+     * guardar, o con el token de una página).
      */
-    public function clienteCon(string $token): MetaApiClient
+    public function clienteCon(string $token, ?string $apiVersion = null): MetaApiClient
     {
-        return new MetaApiClient($token, $this->apiVersion);
+        return new MetaApiClient($token, $apiVersion ?? $this->apiVersion);
     }
 }

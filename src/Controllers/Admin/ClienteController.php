@@ -15,6 +15,7 @@ use MisterCo\Reports\Repositories\CuentaPublicitariaRepository;
 use MisterCo\Reports\Repositories\EntidadesMetaRepository;
 use MisterCo\Reports\Repositories\GoogleAdsRepository;
 use MisterCo\Reports\Repositories\GoogleAnalyticsRepository;
+use MisterCo\Reports\Repositories\RedesSocialesRepository;
 use MisterCo\Reports\Repositories\UsuarioRepository;
 use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\PasswordPolicyService;
@@ -138,6 +139,9 @@ final class ClienteController
             'google_ads_ids_asignadas' => $googleAds->idsAsignadas($id),
             'ga4_propiedades' => $analytics->listarPropiedades(),
             'ga4_ids_asignadas' => $analytics->idsAsignadas($id),
+            'redes_paginas' => $this->container->get(RedesSocialesRepository::class)->listarPaginas(),
+            'redes_paginas_asignadas' => $this->container->get(RedesSocialesRepository::class)->idsPaginasAsignadas($id),
+            'redes_instagram_asignadas' => $this->container->get(RedesSocialesRepository::class)->idsInstagramAsignadas($id),
             'rango_desde_default' => date('Y-m-01', strtotime('-2 months')),
             'rango_hasta_default' => date('Y-m-d'),
             'success' => $session->getFlash('success'),
@@ -233,6 +237,27 @@ final class ClienteController
             'cliente', (string) $clienteId, ['cantidad' => count($ids), 'propiedad_ids' => $ids]
         );
         $this->container->get(Session::class)->flash('success', count($ids) . ' propiedad(es) de Google Analytics asignada(s) al cliente.');
+
+        return Response::redirect('/admin/clientes/' . $clienteId);
+    }
+
+    /** Reemplaza las páginas de Facebook y cuentas de Instagram asignadas al cliente. */
+    public function asignarRedes(Request $request): Response
+    {
+        $clienteId = (int) ($request->attributes['id'] ?? 0);
+        if ($this->container->get(ClienteRepository::class)->buscarPorId($clienteId) === null) {
+            return Response::redirect('/admin/clientes');
+        }
+        $paginas = $this->idsDelPost($request, 'redes_paginas');
+        $instagram = $this->idsDelPost($request, 'redes_instagram');
+
+        $this->container->get(RedesSocialesRepository::class)->reemplazarAsignaciones($clienteId, $paginas, $instagram);
+        $this->container->get(AuditService::class)->registrar(
+            'cliente.redes_asignadas', $request->attributes['usuario'], $request->ip, $request->userAgent,
+            'cliente', (string) $clienteId, ['paginas' => $paginas, 'instagram' => $instagram]
+        );
+        $this->container->get(Session::class)->flash('success',
+            count($paginas) . ' página(s) de Facebook y ' . count($instagram) . ' cuenta(s) de Instagram asignada(s) al cliente.');
 
         return Response::redirect('/admin/clientes/' . $clienteId);
     }

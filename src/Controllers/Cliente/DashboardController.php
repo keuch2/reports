@@ -13,6 +13,7 @@ use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Services\DashboardPreferenciasService;
 use MisterCo\Reports\Services\DashboardService;
 use MisterCo\Reports\Services\GoogleReporteService;
+use MisterCo\Reports\Services\RedesReporteService;
 use MisterCo\Reports\Services\PermisosService;
 
 /**
@@ -47,6 +48,9 @@ final class DashboardController
             }
             if ($google->tieneAnalytics($clienteId)) {
                 return Response::redirect('/cliente/analytics');
+            }
+            if ($this->container->get(RedesReporteService::class)->tieneRedes($clienteId)) {
+                return Response::redirect('/cliente/redes');
             }
 
             return Response::html($view->render('cliente/sin_datos', [

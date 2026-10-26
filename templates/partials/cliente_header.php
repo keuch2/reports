@@ -1,10 +1,10 @@
 <?php
 /** @var \MisterCo\Reports\Core\View $view */
 /** @var \MisterCo\Reports\Domain\Usuario $usuario */
-/** @var array{meta: bool, google_ads: bool, analytics: bool}|null $fuentes_cliente Compartido por ClienteMiddleware. */
+/** @var array{meta: bool, google_ads: bool, analytics: bool, redes: bool}|null $fuentes_cliente Compartido por ClienteMiddleware. */
 /** @var string|null $seccion */
 
-$fuentes = $fuentes_cliente ?? ['meta' => true, 'google_ads' => false, 'analytics' => false];
+$fuentes = $fuentes_cliente ?? ['meta' => true, 'google_ads' => false, 'analytics' => false, 'redes' => false];
 $seccion = $seccion ?? 'meta';
 ?>
 <header class="shell__header">
@@ -18,6 +18,9 @@ $seccion = $seccion ?? 'meta';
         <?php endif; ?>
         <?php if ($fuentes['analytics']): ?>
             <a href="<?= $view->url('/cliente/analytics') ?>" class="<?= $seccion === 'analytics' ? 'active' : '' ?>">Google Analytics</a>
+        <?php endif; ?>
+        <?php if ($fuentes['redes']): ?>
+            <a href="<?= $view->url('/cliente/redes') ?>" class="<?= $seccion === 'redes' ? 'active' : '' ?>">Facebook e Instagram</a>
         <?php endif; ?>
         <?php if ($fuentes['meta']): ?>
             <a href="<?= $view->url('/cliente/preferencias') ?>" class="<?= $seccion === 'preferencias' ? 'active' : '' ?>">Preferencias</a>
