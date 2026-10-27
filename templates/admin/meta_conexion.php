@@ -59,7 +59,7 @@
             <p class="muted" style="font-size:0.85rem">
                 Se abrirá Facebook para autorizar el acceso de solo lectura a tus campañas
                 y a las analíticas de tus páginas e Instagram (<code>ads_read</code>, <code>business_management</code>,
-                <code>pages_read_engagement</code>, <code>read_insights</code>, <code>instagram_manage_insights</code>). El acceso dura ~60 días
+                <code>pages_read_engagement</code>, <code>instagram_manage_insights</code>). El acceso dura ~60 días
                 y podés renovarlo con un click desde acá.
             </p>
         <?php else: ?>
@@ -89,7 +89,7 @@
                 Alternativa técnica: generá un token de System User en el Business Manager
                 (Configuración del negocio → Usuarios → Usuarios del sistema) con permisos
                 <code>ads_read</code> y <code>business_management</code> (y para analíticas de páginas e Instagram:
-                <code>pages_show_list</code>, <code>pages_read_engagement</code>, <code>read_insights</code>,
+                <code>pages_show_list</code>, <code>pages_read_engagement</code>,
                 <code>instagram_basic</code>, <code>instagram_manage_insights</code>), y pegalo acá.
                 A diferencia de la conexión con Facebook, este token <strong>no vence</strong>.
             </p>
