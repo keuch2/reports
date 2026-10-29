@@ -46,6 +46,15 @@ final class PreviewClienteController
         $prefs = $this->container->get(DashboardPreferenciasService::class)->obtener($clienteId);
 
         $campaniasAsignadas = $service->campaniasDelCliente($clienteId);
+        $fuentes = $this->container->get(ClienteRepository::class)->fuentesAsignadas($clienteId);
+        if ($campaniasAsignadas === []) {
+            // Igual que el cliente: sin Meta Ads, el dashboard arranca en la primera fuente con datos.
+            foreach (['google_ads' => 'google-ads', 'analytics' => 'analytics', 'redes' => 'redes'] as $clave => $ruta) {
+                if ($fuentes[$clave]) {
+                    return Response::redirect('/admin/clientes/' . $clienteId . '/' . $ruta);
+                }
+            }
+        }
 
         $mesesDisponibles = $service->mesesConDatosDelCliente($clienteId);
         $periodo = PeriodoReporte::desdeRequest($request, $mesesDisponibles);
@@ -70,7 +79,7 @@ final class PreviewClienteController
             'usuario' => $request->attributes['usuario'],
             'titulo' => 'Vista previa · ' . $cliente['nombre_comercial'],
             'cliente' => $cliente,
-            'fuentes' => $this->container->get(ClienteRepository::class)->fuentesAsignadas($clienteId),
+            'fuentes' => $fuentes,
             'campanias_asignadas_count' => count($campaniasAsignadas),
             'moneda' => $moneda,
             'desde' => $desde,

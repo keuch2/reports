@@ -3,7 +3,6 @@
 /** @var \MisterCo\Reports\Domain\Usuario $usuario */
 /** @var array<string,mixed> $cliente */
 /** @var bool $es_admin */
-/** @var bool $asignado */
 /** @var string $base */
 /** @var int $campanias_asignadas_count */
 /** @var string $moneda */
@@ -41,12 +40,7 @@ $hayValor = (float) ($totales['valor_conversiones'] ?? 0) > 0;
         </div>
     </div>
 
-    <?php if (!$asignado): ?>
-        <div class="alert alert--warning">
-            Este cliente no tiene campañas de Google Ads asignadas.
-            <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id'])) ?>">Asignar campañas</a>.
-        </div>
-    <?php elseif ($meses_disponibles === []): ?>
+    <?php if ($meses_disponibles === []): ?>
         <p class="muted">Aún no hay datos importados para las campañas de Google Ads.</p>
     <?php else: ?>
         <?= $view->renderPartial('partials/filtro_periodo', [
@@ -125,7 +119,7 @@ $hayValor = (float) ($totales['valor_conversiones'] ?? 0) > 0;
     <?php endif; ?>
 </section>
 
-<?php if ($asignado && $evolucion !== []): ?>
+<?php if ($evolucion !== []): ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
     const evolucion = <?= json_encode($evolucion, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK) ?>;

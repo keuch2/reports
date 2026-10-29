@@ -3,7 +3,6 @@
 /** @var \MisterCo\Reports\Domain\Usuario $usuario */
 /** @var array<string,mixed> $cliente */
 /** @var bool $es_admin */
-/** @var bool $asignado */
 /** @var string $base */
 /** @var array{meta: bool, google_ads: bool, analytics: bool, redes: bool} $fuentes */
 /** @var \MisterCo\Reports\Domain\PeriodoReporte $periodo */
@@ -62,12 +61,7 @@ $nombres = array_merge(
         </div>
     </div>
 
-    <?php if (!$asignado): ?>
-        <div class="alert alert--warning">
-            Este cliente no tiene páginas de Facebook ni cuentas de Instagram asignadas.
-            <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id'])) ?>">Asignarlas</a>.
-        </div>
-    <?php elseif ($meses_disponibles === []): ?>
+    <?php if ($meses_disponibles === []): ?>
         <p class="muted">Aún no hay analíticas importadas de Facebook ni de Instagram.</p>
     <?php else: ?>
         <?= $view->renderPartial('partials/filtro_periodo', [
@@ -171,7 +165,7 @@ $nombres = array_merge(
     <?php endif; ?>
 </section>
 
-<?php if ($asignado && $meses_disponibles !== []): ?>
+<?php if ($meses_disponibles !== []): ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
 (function () {

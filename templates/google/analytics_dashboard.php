@@ -3,7 +3,6 @@
 /** @var \MisterCo\Reports\Domain\Usuario $usuario */
 /** @var array<string,mixed> $cliente */
 /** @var bool $es_admin */
-/** @var bool $asignado */
 /** @var string $base */
 /** @var list<array<string,mixed>> $propiedades_asignadas */
 /** @var string $moneda */
@@ -46,12 +45,7 @@ $nPropiedades = count($propiedades_asignadas);
         </div>
     </div>
 
-    <?php if (!$asignado): ?>
-        <div class="alert alert--warning">
-            Este cliente no tiene propiedades de Google Analytics asignadas.
-            <a href="<?= $view->url('/admin/clientes/' . ((int) $cliente['id'])) ?>">Asignar propiedades</a>.
-        </div>
-    <?php elseif ($meses_disponibles === []): ?>
+    <?php if ($meses_disponibles === []): ?>
         <p class="muted">Aún no hay datos importados de Google Analytics.</p>
     <?php else: ?>
         <?= $view->renderPartial('partials/filtro_periodo', [
@@ -141,7 +135,7 @@ $nPropiedades = count($propiedades_asignadas);
     <?php endif; ?>
 </section>
 
-<?php if ($asignado && $evolucion !== []): ?>
+<?php if ($evolucion !== []): ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
     const evolucion = <?= json_encode($evolucion, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK) ?>;

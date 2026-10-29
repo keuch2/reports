@@ -4,9 +4,8 @@
  * Facebook e Instagram.
  * Mantienen el período elegido al cambiar de pestaña.
  *
- * El cliente ve solo las fuentes que tiene asignadas (si es una sola, no hay
- * pestañas). El admin ve las tres; las no asignadas aparecen atenuadas y al
- * entrar muestran el aviso para asignarlas.
+ * Solo aparecen las fuentes que el cliente tiene asignadas (si es una sola, no
+ * hay pestañas); la vista previa del admin muestra lo mismo que el cliente.
  *
  * @var \MisterCo\Reports\Core\View $view
  * @var string $activa 'meta' | 'google_ads' | 'analytics' | 'redes'
@@ -23,9 +22,7 @@ $pestanas = [
     'analytics' => ['Google Analytics', $base . '/analytics'],
     'redes' => ['Facebook e Instagram', $base . '/redes'],
 ];
-if (!$es_admin) {
-    $pestanas = array_filter($pestanas, static fn (string $clave): bool => $fuentes[$clave], ARRAY_FILTER_USE_KEY);
-}
+$pestanas = array_filter($pestanas, static fn (string $clave): bool => $fuentes[$clave], ARRAY_FILTER_USE_KEY);
 if (count($pestanas) < 2) {
     return;
 }
@@ -34,9 +31,8 @@ $query = isset($periodo) && $periodo !== null && $periodo->query() !== '' ? '?' 
 <nav class="tabs" aria-label="Reportes">
     <?php foreach ($pestanas as $clave => [$etiqueta, $url]): ?>
         <a href="<?= $view->e($view->url($url) . $query) ?>"
-           class="tabs__item<?= $clave === $activa ? ' tabs__item--activa' : '' ?><?= $fuentes[$clave] ? '' : ' tabs__item--vacia' ?>"
-           <?= $clave === $activa ? 'aria-current="page"' : '' ?>
-           <?= $fuentes[$clave] ? '' : 'title="Sin campañas o propiedades asignadas"' ?>>
+           class="tabs__item<?= $clave === $activa ? ' tabs__item--activa' : '' ?>"
+           <?= $clave === $activa ? 'aria-current="page"' : '' ?>>
             <?= $view->e($etiqueta) ?>
         </a>
     <?php endforeach; ?>

@@ -154,7 +154,7 @@ final class ReporteFuenteController
     /**
      * Cliente del request (el propio si es cliente, el de la ruta si es admin)
      * con los datos comunes de la vista. El cliente sin asignaciones de esta
-     * fuente recibe 403; el admin ve la pantalla con el aviso.
+     * fuente (cliente o admin) vuelve al inicio del dashboard.
      *
      * @return array{cliente_id:int, vista:array<string,mixed>}|Response
      */
@@ -176,8 +176,9 @@ final class ReporteFuenteController
             'analytics' => $google->tieneAnalytics($clienteId),
             'redes' => $this->container->get(RedesReporteService::class)->tieneRedes($clienteId),
         };
-        if (!$asignado && !$esAdmin) {
-            return Response::html('<h1>403 — No tenés datos de ' . self::FUENTES[$fuente]['nombre'] . ' asignados.</h1>', 403);
+        if (!$asignado) {
+            // Sin datos de esta fuente no hay sección: al inicio del dashboard, que lleva a la primera con datos.
+            return Response::redirect($esAdmin ? '/admin/clientes/' . $clienteId . '/dashboard' : '/cliente');
         }
 
         return [
@@ -186,7 +187,6 @@ final class ReporteFuenteController
                 'usuario' => $usuario,
                 'cliente' => $cliente,
                 'es_admin' => $esAdmin,
-                'asignado' => $asignado,
                 'base' => ($esAdmin ? '/admin/clientes/' . $clienteId : '/cliente') . '/' . self::FUENTES[$fuente]['ruta'],
                 'fuentes' => $this->container->get(ClienteRepository::class)->fuentesAsignadas($clienteId),
             ],
