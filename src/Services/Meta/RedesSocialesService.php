@@ -64,6 +64,9 @@ final class RedesSocialesService
     /** Código de Meta para parámetro/métrica inválida. */
     private const CODIGO_PARAMETRO_INVALIDO = 100;
 
+    /** Códigos de Meta para permiso faltante en el token. */
+    private const CODIGOS_SIN_PERMISO = [10, 200];
+
     private int $llamadas = 0;
 
     public function __construct(
@@ -157,27 +160,36 @@ final class RedesSocialesService
                 $this->repo->guardarMetricasDia('facebook', $paginaId, $fecha, $valores);
             }
 
+            // Leer publicaciones de una página exige además pages_read_user_content.
+            // Sin ese permiso se guardan igual las métricas y queda un aviso.
             $publicaciones = 0;
-            foreach ($api->paginar("{$pageId}/published_posts", [
-                'fields' => [
-                    'id', 'message', 'created_time', 'permalink_url', 'full_picture', 'status_type', 'shares',
-                    'reactions.summary(total_count).limit(0)', 'comments.summary(total_count).limit(0)',
-                ],
-                'since' => $this->inicioDelDia($desde),
-                'until' => $this->inicioDelDia($hasta, 1),
-                'limit' => 50,
-            ]) as $post) {
-                $this->repo->guardarPublicacion(
-                    'facebook', $paginaId, (string) $post['id'], $this->fechaHoraLocal((string) $post['created_time']),
-                    isset($post['status_type']) ? (string) $post['status_type'] : null,
-                    isset($post['message']) ? (string) $post['message'] : null,
-                    isset($post['full_picture']) ? (string) $post['full_picture'] : null,
-                    isset($post['permalink_url']) ? (string) $post['permalink_url'] : null,
-                    (int) ($post['reactions']['summary']['total_count'] ?? 0),
-                    (int) ($post['comments']['summary']['total_count'] ?? 0),
-                    (int) ($post['shares']['count'] ?? 0),
-                );
-                $publicaciones++;
+            try {
+                foreach ($api->paginar("{$pageId}/published_posts", [
+                    'fields' => [
+                        'id', 'message', 'created_time', 'permalink_url', 'full_picture', 'status_type', 'shares',
+                        'reactions.summary(total_count).limit(0)', 'comments.summary(total_count).limit(0)',
+                    ],
+                    'since' => $this->inicioDelDia($desde),
+                    'until' => $this->inicioDelDia($hasta, 1),
+                    'limit' => 50,
+                ]) as $post) {
+                    $this->repo->guardarPublicacion(
+                        'facebook', $paginaId, (string) $post['id'], $this->fechaHoraLocal((string) $post['created_time']),
+                        isset($post['status_type']) ? (string) $post['status_type'] : null,
+                        isset($post['message']) ? (string) $post['message'] : null,
+                        isset($post['full_picture']) ? (string) $post['full_picture'] : null,
+                        isset($post['permalink_url']) ? (string) $post['permalink_url'] : null,
+                        (int) ($post['reactions']['summary']['total_count'] ?? 0),
+                        (int) ($post['comments']['summary']['total_count'] ?? 0),
+                        (int) ($post['shares']['count'] ?? 0),
+                    );
+                    $publicaciones++;
+                }
+            } catch (MetaApiException $e) {
+                if ($e instanceof MetaRateLimitException || !in_array($e->metaCode, self::CODIGOS_SIN_PERMISO, true)) {
+                    throw $e;
+                }
+                $avisos['publicaciones'] = 'Meta no permitió leer las publicaciones de la página (falta el permiso pages_read_user_content): ' . $e->getMessage();
             }
             $this->llamadas++;
 
