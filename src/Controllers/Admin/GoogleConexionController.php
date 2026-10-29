@@ -48,6 +48,22 @@ final class GoogleConexionController
             'oauth_redirect_uri' => $oauth->redirectUri(),
             'cuentas_ads' => $this->container->get(GoogleAdsRepository::class)->listarCuentas(),
             'propiedades_ga4' => $this->container->get(GoogleAnalyticsRepository::class)->listarPropiedades(),
+            'error' => $session->getFlash('error'),
+            'success' => $session->getFlash('success'),
+        ]));
+    }
+
+    /** Pestaña "Google Ads y Analytics" de Importar: formulario y últimas importaciones. */
+    public function mostrarImportar(Request $request): Response
+    {
+        $session = $this->container->get(Session::class);
+
+        return Response::html($this->container->get(View::class)->render('admin/importar_google', [
+            'usuario' => $request->attributes['usuario'],
+            'titulo' => 'Importar · Google Ads y Analytics',
+            'tiene_token' => $this->container->get(GoogleTokenService::class)->tieneToken(),
+            'cuentas_ads' => $this->container->get(GoogleAdsRepository::class)->listarCuentas(),
+            'propiedades_ga4' => $this->container->get(GoogleAnalyticsRepository::class)->listarPropiedades(),
             'recientes' => $this->container->get(ImportacionGoogleRepository::class)->recientes(),
             'rango_inicio_default' => date('Y-m-d', strtotime('-30 days')),
             'rango_fin_default' => date('Y-m-d', strtotime('-1 day')),
@@ -162,12 +178,12 @@ final class GoogleConexionController
         if (!in_array($fuente, ['ads', 'ga4'], true) || $id <= 0 || !$this->esFecha($desde) || !$this->esFecha($hasta)) {
             $session->flash('error', 'Datos inválidos: revisá el origen y el rango.');
 
-            return Response::redirect('/admin/google');
+            return Response::redirect('/admin/importar/google');
         }
         if ($desde > $hasta) {
             $session->flash('error', 'La fecha de inicio no puede ser posterior a la fecha de fin.');
 
-            return Response::redirect('/admin/google');
+            return Response::redirect('/admin/importar/google');
         }
 
         set_time_limit(0);
@@ -193,7 +209,7 @@ final class GoogleConexionController
             $session->flash('error', $e instanceof GoogleApiException ? $this->mensajeError($e) : 'Fallo en la importación: ' . $e->getMessage());
         }
 
-        return Response::redirect('/admin/google');
+        return Response::redirect('/admin/importar/google');
     }
 
     private function sincronizarYResumir(): string

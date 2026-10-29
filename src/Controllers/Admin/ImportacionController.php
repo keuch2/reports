@@ -13,7 +13,6 @@ use MisterCo\Reports\Domain\Usuario;
 use MisterCo\Reports\Repositories\CuentaPublicitariaRepository;
 use MisterCo\Reports\Repositories\EntidadesMetaRepository;
 use MisterCo\Reports\Repositories\ImportacionRepository;
-use MisterCo\Reports\Repositories\RedesSocialesRepository;
 use MisterCo\Reports\Services\AuditService;
 use MisterCo\Reports\Services\Meta\ImportacionService;
 use MisterCo\Reports\Services\Meta\MetaApiException;
@@ -51,14 +50,12 @@ final class ImportacionController
 
         return Response::html($view->render('admin/importar', [
             'usuario' => $request->attributes['usuario'],
-            'titulo' => 'Importar datos',
+            'titulo' => 'Importar · Meta Ads',
             'tiene_token' => $tokenService->tieneToken(),
             'cuentas' => $cuentas,
             'ultimas_fechas' => $ultimasFechas,
             'campanias_por_cuenta' => $campaniasPorCuenta,
             'recientes' => $importRepo->recientes(15),
-            'paginas_redes' => $this->container->get(RedesSocialesRepository::class)->listarPaginas(),
-            'recientes_redes' => $this->container->get(RedesSocialesRepository::class)->importacionesRecientes(10),
             'rango_inicio_default' => date('Y-m-d', strtotime('-30 days')),
             'rango_fin_default' => date('Y-m-d'),
             'error' => $session->getFlash('error'),

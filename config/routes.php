@@ -77,7 +77,11 @@ return function (Router $router): void {
     $router->get('/admin/importar', [ImportacionController::class, 'mostrar'], $admin);
     $router->get('/admin/importar/campanias', [ImportacionController::class, 'campaniasEnVivo'], $admin);
     $router->post('/admin/importar', [ImportacionController::class, 'ejecutar'], $adminCsrf);
-    $router->post('/admin/importar/redes', [RedesSocialesController::class, 'importar'], $adminCsrf);
+    $router->get('/admin/importar/redes', [RedesSocialesController::class, 'mostrar'], $admin);
+    $router->post('/admin/importar/redes/iniciar', [RedesSocialesController::class, 'iniciar'], $adminCsrf);
+    $router->post('/admin/importar/redes/{id}/tramo', [RedesSocialesController::class, 'tramo'], $adminCsrf);
+    $router->post('/admin/importar/redes/{id}/finalizar', [RedesSocialesController::class, 'finalizar'], $adminCsrf);
+    $router->get('/admin/importar/google', [GoogleConexionController::class, 'mostrarImportar'], $admin);
 
     $router->get('/admin/clientes', [AdminClienteController::class, 'listar'], $admin);
     $router->get('/admin/clientes/nuevo', [AdminClienteController::class, 'mostrarNuevo'], $admin);

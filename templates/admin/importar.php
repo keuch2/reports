@@ -18,7 +18,7 @@
 <?= $view->renderPartial('partials/admin_header', ['usuario' => $usuario, 'seccion' => 'importar']) ?>
 
 <section class="shell__body">
-    <h1>Importar datos desde Meta</h1>
+    <?= $view->renderPartial('partials/importar_pestanas', ['activa' => 'meta']) ?>
 
     <?php if ($error): ?>
         <div class="alert alert--error"><?= $view->e((string) $error) ?></div>
@@ -39,7 +39,7 @@
     <?php else: ?>
         <article class="card">
             <h2>Nueva importación</h2>
-            <form method="POST" action="<?= $view->url('/admin/importar') ?>" class="form-stack" id="importar-form">
+            <form method="POST" action="<?= $view->url('/admin/importar') ?>" class="form-stack" id="importar-form" data-importacion="Importando campañas de Meta">
                 <?= $view->csrfField() ?>
                 <label class="field">
                     <span class="field__label">Cuenta publicitaria</span>
@@ -161,68 +161,6 @@
         <?php endif; ?>
     </article>
 
-    <article class="card" style="margin-top:1.5rem">
-        <h2>Analíticas de Facebook e Instagram</h2>
-        <?php if ($paginas_redes === []): ?>
-            <p class="muted">No hay páginas sincronizadas. Sincronizalas desde <a href="<?= $view->url('/admin/meta') ?>">Cuenta Meta</a>.</p>
-        <?php else: ?>
-            <form method="POST" action="<?= $view->url('/admin/importar/redes') ?>" class="form-stack" id="importar-redes-form">
-                <?= $view->csrfField() ?>
-                <label class="field">
-                    <span class="field__label">Página o cuenta</span>
-                    <select class="field__input" name="origen" required>
-                        <?php foreach ($paginas_redes as $p): ?>
-                            <option value="facebook:<?= (int) $p['id'] ?>">Facebook · <?= $view->e((string) $p['nombre']) ?></option>
-                            <?php if ($p['ig_id'] !== null): ?>
-                                <option value="instagram:<?= (int) $p['ig_id'] ?>">Instagram · @<?= $view->e((string) $p['ig_username']) ?></option>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
-                <div class="field-row">
-                    <label class="field">
-                        <span class="field__label">Desde</span>
-                        <input class="field__input" type="date" name="rango_inicio" value="<?= $view->e($rango_inicio_default) ?>" required>
-                    </label>
-                    <label class="field">
-                        <span class="field__label">Hasta</span>
-                        <input class="field__input" type="date" name="rango_fin" value="<?= $view->e($rango_fin_default) ?>" required>
-                    </label>
-                </div>
-                <p class="muted" style="font-size:0.85rem;margin:0">
-                    Trae métricas diarias y publicaciones del rango. Meta guarda solo los últimos 2 años y las métricas
-                    tardan hasta 48 h en consolidarse. Instagram se consulta día por día: rangos largos tardan más.
-                </p>
-                <p><button type="submit" class="btn btn--primary" id="importar-redes-btn">Importar analíticas</button></p>
-            </form>
-        <?php endif; ?>
-
-        <?php if ($recientes_redes !== []): ?>
-            <h3>Importaciones recientes</h3>
-            <table class="table">
-                <thead><tr><th>#</th><th>Origen</th><th>Rango</th><th>Estado</th><th class="num">Días</th><th class="num">Publicaciones</th></tr></thead>
-                <tbody>
-                <?php foreach ($recientes_redes as $r): ?>
-                    <tr>
-                        <td>#<?= (int) $r['id'] ?></td>
-                        <td><?= $r['plataforma'] === 'facebook' ? 'Facebook' : 'Instagram' ?> · <?= $view->e((string) ($r['referencia_nombre'] ?? '—')) ?></td>
-                        <td><?= $view->e((string) $r['rango_inicio']) ?> → <?= $view->e((string) $r['rango_fin']) ?></td>
-                        <td>
-                            <span class="badge badge--<?= $view->e((string) $r['estado']) ?>"><?= $view->e((string) $r['estado']) ?></span>
-                            <?php if (!empty($r['error_mensaje'])): ?>
-                                <details><summary><?= $r['estado'] === 'fallida' ? 'Ver error' : 'Ver avisos' ?></summary>
-                                    <pre style="white-space:pre-wrap;font-size:0.78rem;margin:0.25rem 0"><?= $view->e((string) $r['error_mensaje']) ?></pre>
-                                </details>
-                            <?php endif; ?>
-                        </td>
-                        <td class="num"><?= (int) $r['dias_importados'] ?></td>
-                        <td class="num"><?= (int) $r['publicaciones'] ?></td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </article>
 </section>
 
 <script>
@@ -398,12 +336,6 @@ document.getElementById('btn-ninguna').addEventListener('click', () => {
     actualizarModoLabel();
 });
 
-document.getElementById('importar-redes-form')?.addEventListener('submit', function () {
-    const btn = document.getElementById('importar-redes-btn');
-    btn.disabled = true;
-    btn.textContent = 'Importando... no cierres esta ventana';
-});
-
 document.getElementById('importar-form')?.addEventListener('submit', function (ev) {
     // En modo selectivo (importar todo desmarcado) exigimos al menos una campaña,
     // para que no se dispare una cuenta completa por error.
@@ -441,3 +373,5 @@ document.getElementById('btn-incremental')?.addEventListener('click', function (
     recargarSiSelectivo();
 });
 </script>
+
+<?= $view->renderPartial('partials/progreso_importacion') ?>

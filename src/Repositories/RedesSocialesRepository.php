@@ -352,15 +352,46 @@ final class RedesSocialesRepository
         return $this->db->lastInsertId();
     }
 
-    public function finalizarImportacion(int $id, bool $exito, int $dias, int $publicaciones, int $llamadas, ?string $mensaje): void
+    /** @return array<string,mixed>|null Importación con sus avisos acumulados (avisos: array clave => mensaje). */
+    public function buscarImportacion(int $id): ?array
+    {
+        $row = $this->db->selectOne(
+            'SELECT id, plataforma, referencia_id, rango_inicio, rango_fin, estado, dias_importados, avisos
+               FROM importaciones_redes WHERE id = :id',
+            ['id' => $id]
+        );
+        if ($row !== null) {
+            $row['avisos'] = $row['avisos'] !== null ? (array) json_decode((string) $row['avisos'], true) : [];
+        }
+
+        return $row;
+    }
+
+    /**
+     * Suma los días de un tramo y guarda los avisos acumulados.
+     *
+     * @param array<string,string> $avisos
+     */
+    public function registrarTramo(int $id, int $dias, int $llamadas, array $avisos): void
     {
         $this->db->execute(
             'UPDATE importaciones_redes
-                SET estado = :e, finalizado_en = NOW(), dias_importados = :d, publicaciones = :p,
-                    llamadas_meta = :l, error_mensaje = :m
+                SET dias_importados = dias_importados + :d, llamadas_meta = llamadas_meta + :l, avisos = :a
+              WHERE id = :id',
+            ['d' => $dias, 'l' => $llamadas, 'a' => $avisos === [] ? null : json_encode($avisos, JSON_UNESCAPED_UNICODE), 'id' => $id]
+        );
+    }
+
+    /** Cierra la importación. Los días ya se fueron sumando por tramo. */
+    public function finalizarImportacion(int $id, bool $exito, int $publicaciones, int $llamadas, ?string $mensaje): void
+    {
+        $this->db->execute(
+            'UPDATE importaciones_redes
+                SET estado = :e, finalizado_en = NOW(), publicaciones = :p,
+                    llamadas_meta = llamadas_meta + :l, error_mensaje = :m
               WHERE id = :id',
             [
-                'e' => $exito ? 'completada' : 'fallida', 'd' => $dias, 'p' => $publicaciones, 'l' => $llamadas,
+                'e' => $exito ? 'completada' : 'fallida', 'p' => $publicaciones, 'l' => $llamadas,
                 'm' => $mensaje !== null ? mb_substr($mensaje, 0, 5000) : null, 'id' => $id,
             ]
         );
@@ -370,7 +401,9 @@ final class RedesSocialesRepository
     public function importacionesRecientes(int $limite = 15): array
     {
         return $this->db->select(
-            "SELECT i.id, i.plataforma, i.rango_inicio, i.rango_fin, i.estado, i.iniciado_en,
+            "SELECT i.id, i.plataforma, i.rango_inicio, i.rango_fin, i.iniciado_en,
+                    CASE WHEN i.estado = 'en_curso' AND i.iniciado_en < NOW() - INTERVAL 30 MINUTE
+                         THEN 'interrumpida' ELSE i.estado END AS estado,
                     i.dias_importados, i.publicaciones, i.error_mensaje,
                     COALESCE(p.nombre, CONCAT('@', ig.username)) AS referencia_nombre
                FROM importaciones_redes i

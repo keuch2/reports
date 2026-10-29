@@ -22,6 +22,8 @@ use Throwable;
  * - Instagram solo da totales por rango para casi todas sus métricas, así que
  *   se consulta día por día y cada día se guarda apenas llega: si Meta limita
  *   las consultas, lo ya importado queda.
+ * - La importación va por tramos (iniciar → un tramo por petición → finalizar)
+ *   para que ninguna petición web supere el timeout del servidor.
  */
 final class RedesSocialesService
 {
@@ -36,6 +38,13 @@ final class RedesSocialesService
 
     /** Page Insights acepta hasta 90 días por consulta. */
     private const DIAS_POR_CONSULTA_FACEBOOK = 90;
+
+    /**
+     * Días por tramo (una petición web cada uno). Facebook pide pocas consultas
+     * por tramo; Instagram hace ~2 por día, así que va de a una semana.
+     */
+    private const DIAS_POR_TRAMO_FACEBOOK = 90;
+    private const DIAS_POR_TRAMO_INSTAGRAM = 7;
 
     /** Métrica de Page Insights => columna. */
     private const METRICAS_FACEBOOK = [
@@ -119,113 +128,150 @@ final class RedesSocialesService
     }
 
     /**
-     * Importa métricas diarias y publicaciones de una página de Facebook.
+     * Abre una importación y devuelve los tramos en que se va a hacer. Cada
+     * tramo se importa en una petición aparte (importarTramo) para no chocar
+     * con el timeout del servidor web en rangos largos.
      *
-     * @return array{importacion_id:int, dias:int, publicaciones:int, avisos:list<string>}
+     * @param 'facebook'|'instagram' $plataforma
+     * @return array{importacion_id:int, tramos:list<array{0:string, 1:string}>}
      */
-    public function importarFacebook(int $paginaId, string $desde, string $hasta, int $usuarioId): array
+    public function iniciarImportacion(string $plataforma, int $referenciaId, string $desde, string $hasta, int $usuarioId): array
     {
-        $pagina = $this->repo->buscarPagina($paginaId) ?? throw new RuntimeException("Página {$paginaId} no existe.");
-        $pageId = (string) $pagina['page_id'];
+        $this->entidad($plataforma, $referenciaId);
+        $diasPorTramo = $plataforma === 'facebook' ? self::DIAS_POR_TRAMO_FACEBOOK : self::DIAS_POR_TRAMO_INSTAGRAM;
 
-        return $this->ejecutarImportacion('facebook', $paginaId, $desde, $hasta, $usuarioId, function (array &$avisos) use ($pageId, $paginaId, $desde, $hasta): array {
-            $api = $this->clienteDePagina($pageId);
+        return [
+            'importacion_id' => $this->repo->crearImportacion($plataforma, $referenciaId, $usuarioId, $desde, $hasta),
+            'tramos' => $this->tramos($desde, $hasta, $diasPorTramo),
+        ];
+    }
 
-            $porFecha = [];
-            foreach ($this->tramos($desde, $hasta, self::DIAS_POR_CONSULTA_FACEBOOK) as [$inicio, $fin]) {
-                foreach (self::METRICAS_FACEBOOK as $metrica => $columna) {
-                    try {
-                        $resp = $this->get($api, "{$pageId}/insights", [
-                            'metric' => $metrica,
-                            'period' => 'day',
-                            'since' => $this->inicioDelDia($inicio),
-                            'until' => $this->inicioDelDia($fin, 1),
-                        ]);
-                    } catch (MetaApiException $e) {
-                        if ($e->metaCode !== self::CODIGO_PARAMETRO_INVALIDO) {
-                            throw $e;
-                        }
-                        $avisos[$metrica] = "Meta no devolvió «{$metrica}»: {$e->getMessage()}";
-                        continue;
-                    }
-                    foreach ($resp['data'][0]['values'] ?? [] as $v) {
-                        $fecha = $this->fechaDeFinDeDia((string) ($v['end_time'] ?? ''));
-                        if ($fecha !== null && $fecha >= $desde && $fecha <= $hasta) {
-                            $porFecha[$fecha][$columna] = $this->valorEntero($v['value'] ?? null);
-                        }
-                    }
-                }
-            }
-            foreach ($porFecha as $fecha => $valores) {
-                $this->repo->guardarMetricasDia('facebook', $paginaId, $fecha, $valores);
-            }
+    /**
+     * Importa las métricas diarias de un tramo y acumula días y avisos en la
+     * importación. Si falla, la importación queda fallida y lo ya guardado se
+     * conserva.
+     *
+     * @return array{dias:int, avisos:list<string>}
+     */
+    public function importarTramo(int $importacionId, string $desde, string $hasta): array
+    {
+        $imp = $this->importacionEnCurso($importacionId);
+        if ($desde < $imp['rango_inicio'] || $hasta > $imp['rango_fin'] || $desde > $hasta) {
+            throw new RuntimeException('El tramo está fuera del rango de la importación.');
+        }
+        $avisos = $imp['avisos'];
 
-            // Leer publicaciones de una página exige además pages_read_user_content.
-            // Sin ese permiso se guardan igual las métricas y queda un aviso.
-            $publicaciones = 0;
-            try {
-                foreach ($api->paginar("{$pageId}/published_posts", [
-                    'fields' => [
-                        'id', 'message', 'created_time', 'permalink_url', 'full_picture', 'status_type', 'shares',
-                        'reactions.summary(total_count).limit(0)', 'comments.summary(total_count).limit(0)',
-                    ],
-                    'since' => $this->inicioDelDia($desde),
-                    'until' => $this->inicioDelDia($hasta, 1),
-                    'limit' => 50,
-                ]) as $post) {
-                    $this->repo->guardarPublicacion(
-                        'facebook', $paginaId, (string) $post['id'], $this->fechaHoraLocal((string) $post['created_time']),
-                        isset($post['status_type']) ? (string) $post['status_type'] : null,
-                        isset($post['message']) ? (string) $post['message'] : null,
-                        isset($post['full_picture']) ? (string) $post['full_picture'] : null,
-                        isset($post['permalink_url']) ? (string) $post['permalink_url'] : null,
-                        (int) ($post['reactions']['summary']['total_count'] ?? 0),
-                        (int) ($post['comments']['summary']['total_count'] ?? 0),
-                        (int) ($post['shares']['count'] ?? 0),
-                    );
-                    $publicaciones++;
-                }
-            } catch (MetaApiException $e) {
-                if ($e instanceof MetaRateLimitException || !in_array($e->metaCode, self::CODIGOS_SIN_PERMISO, true)) {
-                    throw $e;
-                }
-                $avisos['publicaciones'] = 'Meta no permitió leer las publicaciones de la página (falta el permiso pages_read_user_content): ' . $e->getMessage();
-            }
-            $this->llamadas++;
+        return $this->conRegistroDeFallo($importacionId, function () use ($imp, $desde, $hasta, &$avisos, $importacionId): array {
+            $this->llamadas = 0;
+            $entidad = $this->entidad((string) $imp['plataforma'], (int) $imp['referencia_id']);
+            $dias = $imp['plataforma'] === 'facebook'
+                ? $this->metricasFacebook($entidad, $desde, $hasta, $avisos)
+                : $this->metricasInstagram($entidad, $desde, $hasta, $avisos);
+            $this->repo->registrarTramo($importacionId, $dias, $this->llamadas, $avisos);
 
-            $datos = $this->get($api, $pageId, ['fields' => ['followers_count']]);
-            if (isset($datos['followers_count'])) {
-                $this->repo->actualizarSeguidores('facebook', $paginaId, (int) $datos['followers_count']);
-            }
-
-            return [count($porFecha), $publicaciones];
+            return ['dias' => $dias, 'avisos' => array_values($avisos)];
         });
     }
 
     /**
-     * Importa métricas diarias y publicaciones de una cuenta de Instagram.
+     * Último paso: publicaciones del rango completo y seguidores actuales.
+     * Cierra la importación como completada.
      *
      * @return array{importacion_id:int, dias:int, publicaciones:int, avisos:list<string>}
      */
-    public function importarInstagram(int $cuentaId, string $desde, string $hasta, int $usuarioId): array
+    public function finalizarImportacion(int $importacionId): array
     {
-        $cuenta = $this->repo->buscarInstagram($cuentaId) ?? throw new RuntimeException("Cuenta de Instagram {$cuentaId} no existe.");
-        if ($cuenta['page_id'] === null) {
-            throw new RuntimeException('La cuenta de Instagram no tiene una página de Facebook vinculada: volvé a sincronizar.');
+        $imp = $this->importacionEnCurso($importacionId);
+        $avisos = $imp['avisos'];
+
+        return $this->conRegistroDeFallo($importacionId, function () use ($imp, &$avisos, $importacionId): array {
+            $this->llamadas = 0;
+            $entidad = $this->entidad((string) $imp['plataforma'], (int) $imp['referencia_id']);
+            [$desde, $hasta] = [(string) $imp['rango_inicio'], (string) $imp['rango_fin']];
+            $publicaciones = $imp['plataforma'] === 'facebook'
+                ? $this->publicacionesFacebook($entidad, $desde, $hasta, $avisos)
+                : $this->publicacionesInstagram($entidad, $desde, $hasta);
+
+            $dias = (int) $imp['dias_importados'];
+            $mensajes = array_values($avisos);
+            if ($dias === 0) {
+                $mensajes[] = "Meta no devolvió métricas para {$desde} → {$hasta}. Las páginas necesitan al menos 100 seguidores y Meta solo guarda los últimos 2 años.";
+            }
+            $this->repo->finalizarImportacion($importacionId, true, $publicaciones, $this->llamadas, $mensajes === [] ? null : implode("\n", $mensajes));
+
+            return ['importacion_id' => $importacionId, 'dias' => $dias, 'publicaciones' => $publicaciones, 'avisos' => $mensajes];
+        });
+    }
+
+    /**
+     * Métricas diarias de una página en el rango. Cada métrica se pide por
+     * separado: si Meta rechaza una (dada de baja), se saltea con aviso.
+     *
+     * @param array<string,mixed> $pagina
+     * @param array<string,string> $avisos
+     */
+    private function metricasFacebook(array $pagina, string $desde, string $hasta, array &$avisos): int
+    {
+        $pageId = (string) $pagina['page_id'];
+        $api = $this->clienteDePagina($pageId);
+
+        $porFecha = [];
+        foreach ($this->tramos($desde, $hasta, self::DIAS_POR_CONSULTA_FACEBOOK) as [$inicio, $fin]) {
+            foreach (self::METRICAS_FACEBOOK as $metrica => $columna) {
+                if (isset($avisos[$metrica])) {
+                    continue;
+                }
+                try {
+                    $resp = $this->get($api, "{$pageId}/insights", [
+                        'metric' => $metrica,
+                        'period' => 'day',
+                        'since' => $this->inicioDelDia($inicio),
+                        'until' => $this->inicioDelDia($fin, 1),
+                    ]);
+                } catch (MetaApiException $e) {
+                    if ($e instanceof MetaRateLimitException || $e->metaCode !== self::CODIGO_PARAMETRO_INVALIDO) {
+                        throw $e;
+                    }
+                    $avisos[$metrica] = "Meta no devolvió «{$metrica}»: {$e->getMessage()}";
+                    continue;
+                }
+                foreach ($resp['data'][0]['values'] ?? [] as $v) {
+                    $fecha = $this->fechaDeFinDeDia((string) ($v['end_time'] ?? ''));
+                    if ($fecha !== null && $fecha >= $desde && $fecha <= $hasta) {
+                        $porFecha[$fecha][$columna] = $this->valorEntero($v['value'] ?? null);
+                    }
+                }
+            }
         }
+        foreach ($porFecha as $fecha => $valores) {
+            $this->repo->guardarMetricasDia('facebook', (int) $pagina['id'], $fecha, $valores);
+        }
+
+        return count($porFecha);
+    }
+
+    /**
+     * Métricas diarias de una cuenta de Instagram, día por día (casi todas
+     * solo existen como total del rango pedido). Cada día se guarda apenas llega.
+     *
+     * @param array<string,mixed> $cuenta
+     * @param array<string,string> $avisos
+     */
+    private function metricasInstagram(array $cuenta, string $desde, string $hasta, array &$avisos): int
+    {
         $igId = (string) $cuenta['ig_user_id'];
+        $api = $this->clienteDePagina((string) $cuenta['page_id']);
+        // Las métricas que Meta ya rechazó en tramos anteriores no se vuelven a pedir.
+        $metricas = array_diff_key(self::METRICAS_INSTAGRAM, $avisos);
+        $dias = 0;
 
-        return $this->ejecutarImportacion('instagram', $cuentaId, $desde, $hasta, $usuarioId, function (array &$avisos) use ($cuenta, $igId, $cuentaId, $desde, $hasta): array {
-            $api = $this->clienteDePagina((string) $cuenta['page_id']);
-            $metricas = self::METRICAS_INSTAGRAM;
-            $dias = 0;
+        for ($fecha = $desde; $fecha <= $hasta; $fecha = date('Y-m-d', strtotime($fecha . ' +1 day'))) {
+            $rangoDia = ['period' => 'day', 'since' => $this->inicioDelDia($fecha), 'until' => $this->inicioDelDia($fecha, 1)];
+            $valores = $this->metricasInstagramDelDia($api, $igId, $rangoDia, $metricas, $avisos);
 
-            for ($fecha = $desde; $fecha <= $hasta; $fecha = date('Y-m-d', strtotime($fecha . ' +1 day'))) {
-                $rangoDia = ['period' => 'day', 'since' => $this->inicioDelDia($fecha), 'until' => $this->inicioDelDia($fecha, 1)];
-                $valores = $this->metricasInstagramDelDia($api, $igId, $rangoDia, $metricas, $avisos);
-
-                // Seguidores ganados/perdidos: requiere el desglose por tipo (consulta aparte).
-                // Meta lo omite en cuentas con menos de 100 seguidores.
+            // Seguidores ganados/perdidos: requiere el desglose por tipo (consulta aparte).
+            // Meta lo omite en cuentas con menos de 100 seguidores.
+            if (!isset($avisos['follows_and_unfollows'])) {
                 try {
                     $resp = $this->get($api, "{$igId}/insights", $rangoDia + [
                         'metric' => 'follows_and_unfollows', 'metric_type' => 'total_value', 'breakdown' => 'follow_type',
@@ -244,47 +290,110 @@ final class RedesSocialesService
                     }
                     $avisos['follows_and_unfollows'] = "Meta no devolvió seguidores ganados/perdidos: {$e->getMessage()}";
                 }
-
-                if ($valores !== []) {
-                    $this->repo->guardarMetricasDia('instagram', $cuentaId, $fecha, $valores);
-                    $dias++;
-                }
             }
 
-            // Publicaciones: /media viene de la más nueva a la más vieja.
-            $publicaciones = 0;
-            foreach ($api->paginar("{$igId}/media", [
-                'fields' => ['id', 'caption', 'media_type', 'media_product_type', 'media_url', 'thumbnail_url', 'permalink', 'timestamp', 'like_count', 'comments_count'],
+            if ($valores !== []) {
+                $this->repo->guardarMetricasDia('instagram', (int) $cuenta['id'], $fecha, $valores);
+                $dias++;
+            }
+        }
+
+        return $dias;
+    }
+
+    /**
+     * Publicaciones de la página en el rango y seguidores actuales. Leer
+     * publicaciones exige además pages_read_user_content: sin ese permiso
+     * queda un aviso y la importación se completa igual.
+     *
+     * @param array<string,mixed> $pagina
+     * @param array<string,string> $avisos
+     */
+    private function publicacionesFacebook(array $pagina, string $desde, string $hasta, array &$avisos): int
+    {
+        $pageId = (string) $pagina['page_id'];
+        $api = $this->clienteDePagina($pageId);
+        $publicaciones = 0;
+        try {
+            foreach ($api->paginar("{$pageId}/published_posts", [
+                'fields' => [
+                    'id', 'message', 'created_time', 'permalink_url', 'full_picture', 'status_type', 'shares',
+                    'reactions.summary(total_count).limit(0)', 'comments.summary(total_count).limit(0)',
+                ],
+                'since' => $this->inicioDelDia($desde),
+                'until' => $this->inicioDelDia($hasta, 1),
                 'limit' => 50,
-            ]) as $m) {
-                $publicadoEn = $this->fechaHoraLocal((string) $m['timestamp']);
-                if (substr($publicadoEn, 0, 10) > $hasta) {
-                    continue;
-                }
-                if (substr($publicadoEn, 0, 10) < $desde) {
-                    break;
-                }
+            ]) as $post) {
                 $this->repo->guardarPublicacion(
-                    'instagram', $cuentaId, (string) $m['id'], $publicadoEn,
-                    (string) ($m['media_product_type'] ?? $m['media_type'] ?? ''),
-                    isset($m['caption']) ? (string) $m['caption'] : null,
-                    isset($m['thumbnail_url']) ? (string) $m['thumbnail_url'] : (isset($m['media_url']) ? (string) $m['media_url'] : null),
-                    isset($m['permalink']) ? (string) $m['permalink'] : null,
-                    (int) ($m['like_count'] ?? 0),
-                    (int) ($m['comments_count'] ?? 0),
-                    0,
+                    'facebook', (int) $pagina['id'], (string) $post['id'], $this->fechaHoraLocal((string) $post['created_time']),
+                    isset($post['status_type']) ? (string) $post['status_type'] : null,
+                    isset($post['message']) ? (string) $post['message'] : null,
+                    isset($post['full_picture']) ? (string) $post['full_picture'] : null,
+                    isset($post['permalink_url']) ? (string) $post['permalink_url'] : null,
+                    (int) ($post['reactions']['summary']['total_count'] ?? 0),
+                    (int) ($post['comments']['summary']['total_count'] ?? 0),
+                    (int) ($post['shares']['count'] ?? 0),
                 );
                 $publicaciones++;
             }
-            $this->llamadas++;
-
-            $datos = $this->get($api, $igId, ['fields' => ['followers_count']]);
-            if (isset($datos['followers_count'])) {
-                $this->repo->actualizarSeguidores('instagram', $cuentaId, (int) $datos['followers_count']);
+        } catch (MetaApiException $e) {
+            if ($e instanceof MetaRateLimitException || !in_array($e->metaCode, self::CODIGOS_SIN_PERMISO, true)) {
+                throw $e;
             }
+            $avisos['publicaciones'] = 'Meta no permitió leer las publicaciones de la página (falta el permiso pages_read_user_content): ' . $e->getMessage();
+        }
+        $this->llamadas++;
 
-            return [$dias, $publicaciones];
-        });
+        $datos = $this->get($api, $pageId, ['fields' => ['followers_count']]);
+        if (isset($datos['followers_count'])) {
+            $this->repo->actualizarSeguidores('facebook', (int) $pagina['id'], (int) $datos['followers_count']);
+        }
+
+        return $publicaciones;
+    }
+
+    /**
+     * Publicaciones de la cuenta en el rango y seguidores actuales. /media
+     * viene de la más nueva a la más vieja: se corta al pasar el inicio.
+     *
+     * @param array<string,mixed> $cuenta
+     */
+    private function publicacionesInstagram(array $cuenta, string $desde, string $hasta): int
+    {
+        $igId = (string) $cuenta['ig_user_id'];
+        $api = $this->clienteDePagina((string) $cuenta['page_id']);
+        $publicaciones = 0;
+        foreach ($api->paginar("{$igId}/media", [
+            'fields' => ['id', 'caption', 'media_type', 'media_product_type', 'media_url', 'thumbnail_url', 'permalink', 'timestamp', 'like_count', 'comments_count'],
+            'limit' => 50,
+        ]) as $m) {
+            $publicadoEn = $this->fechaHoraLocal((string) $m['timestamp']);
+            if (substr($publicadoEn, 0, 10) > $hasta) {
+                continue;
+            }
+            if (substr($publicadoEn, 0, 10) < $desde) {
+                break;
+            }
+            $this->repo->guardarPublicacion(
+                'instagram', (int) $cuenta['id'], (string) $m['id'], $publicadoEn,
+                (string) ($m['media_product_type'] ?? $m['media_type'] ?? ''),
+                isset($m['caption']) ? (string) $m['caption'] : null,
+                isset($m['thumbnail_url']) ? (string) $m['thumbnail_url'] : (isset($m['media_url']) ? (string) $m['media_url'] : null),
+                isset($m['permalink']) ? (string) $m['permalink'] : null,
+                (int) ($m['like_count'] ?? 0),
+                (int) ($m['comments_count'] ?? 0),
+                0,
+            );
+            $publicaciones++;
+        }
+        $this->llamadas++;
+
+        $datos = $this->get($api, $igId, ['fields' => ['followers_count']]);
+        if (isset($datos['followers_count'])) {
+            $this->repo->actualizarSeguidores('instagram', (int) $cuenta['id'], (int) $datos['followers_count']);
+        }
+
+        return $publicaciones;
     }
 
     /**
@@ -334,37 +443,55 @@ final class RedesSocialesService
     }
 
     /**
-     * Registra la importación y la cierra como completada o fallida. Si Meta
-     * limita las consultas a mitad de camino, lo ya guardado queda y el
-     * mensaje lo indica.
+     * Página o cuenta de Instagram a importar (la de Instagram con el page_id
+     * de su página, cuyo token se usa para consultarla).
      *
-     * @param 'facebook'|'instagram' $plataforma
-     * @param callable(array<string,string>&): array{0:int, 1:int} $trabajo
-     * @return array{importacion_id:int, dias:int, publicaciones:int, avisos:list<string>}
+     * @return array<string,mixed>
      */
-    private function ejecutarImportacion(string $plataforma, int $referenciaId, string $desde, string $hasta, int $usuarioId, callable $trabajo): array
+    private function entidad(string $plataforma, int $id): array
     {
-        $this->llamadas = 0;
-        $importacionId = $this->repo->crearImportacion($plataforma, $referenciaId, $usuarioId, $desde, $hasta);
-        $avisos = [];
+        if ($plataforma === 'facebook') {
+            return $this->repo->buscarPagina($id) ?? throw new RuntimeException("Página {$id} no existe.");
+        }
+        $cuenta = $this->repo->buscarInstagram($id) ?? throw new RuntimeException("Cuenta de Instagram {$id} no existe.");
+        if ($cuenta['page_id'] === null) {
+            throw new RuntimeException('La cuenta de Instagram no tiene una página de Facebook vinculada: volvé a sincronizar.');
+        }
+
+        return $cuenta;
+    }
+
+    /** @return array<string,mixed> */
+    private function importacionEnCurso(int $importacionId): array
+    {
+        $imp = $this->repo->buscarImportacion($importacionId) ?? throw new RuntimeException("Importación {$importacionId} no existe.");
+        if ($imp['estado'] !== 'en_curso') {
+            throw new RuntimeException("La importación #{$importacionId} ya terminó ({$imp['estado']}).");
+        }
+
+        return $imp;
+    }
+
+    /**
+     * Ejecuta un paso de la importación; si falla, la marca como fallida (lo
+     * ya guardado queda) y relanza el error.
+     *
+     * @template T
+     * @param callable(): T $paso
+     * @return T
+     */
+    private function conRegistroDeFallo(int $importacionId, callable $paso): mixed
+    {
         try {
-            [$dias, $publicaciones] = $trabajo($avisos);
+            return $paso();
         } catch (MetaRateLimitException $e) {
-            $this->repo->finalizarImportacion($importacionId, false, 0, 0, $this->llamadas,
-                'Meta limitó la cantidad de consultas. Los días ya importados quedaron guardados; reintentá el resto más tarde. ' . $e->getMessage());
+            $this->repo->finalizarImportacion($importacionId, false, 0, $this->llamadas,
+                'Meta limitó la cantidad de consultas. Los días ya importados quedaron guardados; importá el resto más tarde. ' . $e->getMessage());
             throw $e;
         } catch (Throwable $e) {
-            $this->repo->finalizarImportacion($importacionId, false, 0, 0, $this->llamadas, $e->getMessage());
+            $this->repo->finalizarImportacion($importacionId, false, 0, $this->llamadas, $e->getMessage());
             throw $e;
         }
-
-        $avisos = array_values($avisos);
-        if ($dias === 0) {
-            $avisos[] = "Meta no devolvió métricas para {$desde} → {$hasta}. Page Insights exige al menos 100 seguidores y solo guarda los últimos 2 años.";
-        }
-        $this->repo->finalizarImportacion($importacionId, true, $dias, $publicaciones, $this->llamadas, $avisos === [] ? null : implode("\n", $avisos));
-
-        return ['importacion_id' => $importacionId, 'dias' => $dias, 'publicaciones' => $publicaciones, 'avisos' => $avisos];
     }
 
     /** Cliente de la API con el token de la página (lo exige Page Insights). */
